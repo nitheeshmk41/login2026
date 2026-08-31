@@ -256,13 +256,22 @@ export const Navbar: React.FC<NavbarProps> = () => {
             </Link>
 
             {!isAuthenticated && (
-              <Link
-                to="/alumni"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block text-xs font-mono font-bold text-[#E01B22] pt-2 border-t border-[#2A1A1D]"
-              >
-                ALUMNI SIGNUP
-              </Link>
+              <>
+                <Link
+                  to="/register"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-xs font-mono font-bold text-[#E01B22] pt-2 border-t border-[#2A1A1D]"
+                >
+                  REGISTRATION
+                </Link>
+                <Link
+                  to="/alumni"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-xs font-mono font-bold text-[#E08A17] pt-2"
+                >
+                  ALUMNI SIGNUP
+                </Link>
+              </>
             )}
 
             {isAuthenticated && (
