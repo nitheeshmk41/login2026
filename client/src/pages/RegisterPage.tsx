@@ -345,9 +345,15 @@ END:VCALENDAR`;
         ) : (
           <div className="text-center space-y-3">
             <img src="/assets/login.webp" alt="LOGIN 2K26 Logo" className="h-16 w-auto mx-auto drop-shadow-[0_0_15px_rgba(224,27,34,0.4)]" />
-            <h1 className="text-3xl font-display font-black text-[#F7F2F2] uppercase tracking-wider">
-              REGISTER FOR LOGIN 2K26
-            </h1>
+            <div className="space-y-1">
+              <h1 className="text-3xl font-display font-black text-[#F7F2F2] uppercase tracking-wider">
+                REGISTER FOR LOGIN 2K26
+              </h1>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-mono font-bold tracking-widest uppercase rounded-sm shadow-[0_0_15px_rgba(234,179,8,0.15)]">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Only for PG Students
+              </span>
+            </div>
             <p className="text-xs font-mono text-[#A79798]">
               National Level Cyber Symposium • Department of Computer Applications, PSG College of Technology
             </p>
