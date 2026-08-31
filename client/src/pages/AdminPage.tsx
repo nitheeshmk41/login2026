@@ -60,6 +60,7 @@ export const AdminPage: React.FC = () => {
 
   // Create User Form State
   const [newUserName, setNewUserName] = useState('');
+  const [newUserLoginId, setNewUserLoginId] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -176,6 +177,7 @@ export const AdminPage: React.FC = () => {
       setCreatingUser(true);
       await api.users.create({
         name: newUserName.trim(),
+        login_id: newUserLoginId.trim() || undefined,
         email: newUserEmail.trim(),
         phone: newUserPhone.trim() || '9876543210',
         password: newUserPassword,
@@ -187,6 +189,7 @@ export const AdminPage: React.FC = () => {
 
       alert('User created and saved to database successfully!');
       setNewUserName('');
+      setNewUserLoginId('');
       setNewUserEmail('');
       setNewUserPhone('');
       setNewUserPassword('');
@@ -803,7 +806,7 @@ export const AdminPage: React.FC = () => {
                 <ShieldAlert className="w-5 h-5 text-[#E01B22]" /> ADD NEW DESK OFFICIAL / COORDINATOR
               </h2>
               <form onSubmit={handleCreateUser} className="space-y-4 text-xs font-body">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-[#A79798] mb-1 font-semibold">Full Name *</label>
                     <input
@@ -812,6 +815,16 @@ export const AdminPage: React.FC = () => {
                       onChange={(e) => setNewUserName(e.target.value)}
                       placeholder="e.g. Swarna Rathna A"
                       required
+                      className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-2.5 rounded-[2px] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[#A79798] mb-1 font-semibold">Login ID / Username</label>
+                    <input
+                      type="text"
+                      value={newUserLoginId}
+                      onChange={(e) => setNewUserLoginId(e.target.value)}
+                      placeholder="e.g. EVENT01"
                       className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-2.5 rounded-[2px] outline-none"
                     />
                   </div>
@@ -919,9 +932,8 @@ export const AdminPage: React.FC = () => {
             {/* User Management Table */}
             <div className="bg-[#130C0E] border border-[#2A1A1D] p-6 rounded-[2px] space-y-6">
               <h2 className="text-lg font-display font-bold text-[#F7F2F2]">
-                ALL USERS & AUTHORIZED PERSONNEL ({users.length})
+                ALL USERS & AUTHORIZED PERSONNEL ({users.filter(u => u.user_type !== 'ALUMNI').length})
               </h2>
-
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs font-body">
                   <thead className="bg-[#0A0607] text-[#6B5A5C] font-mono border-b border-[#3E2529]">
@@ -935,7 +947,7 @@ export const AdminPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#2A1A1D]">
-                    {users.map((u) => (
+                    {users.filter(u => u.user_type !== 'ALUMNI').map((u) => (
                       <tr key={u.id} className="hover:bg-[#1A1114] transition-colors">
                         <td className="p-3.5 font-mono text-[#6B5A5C]">#{u.id}</td>
                         <td className="p-3.5">
@@ -973,6 +985,12 @@ export const AdminPage: React.FC = () => {
                             className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E08A17] text-[#E08A17] text-[10px] font-bold font-mono rounded-[2px] transition-colors"
                           >
                             EDIT
+                          </button>
+                          <button
+                            onClick={() => deleteManagedUser(u)}
+                            className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E01B22] text-[#E01B22] text-[10px] font-bold font-mono rounded-[2px] transition-colors"
+                          >
+                            DELETE
                           </button>
                         </div>
                         </td>

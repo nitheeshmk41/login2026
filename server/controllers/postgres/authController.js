@@ -179,6 +179,25 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Email is required for registration." });
     }
 
+    if (!otp) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "OTP is required for registration." });
+    }
+
+    const validOtp = await otpModel.findOne({ where: { email: finalEmail, otp }, transaction });
+    if (!validOtp) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Invalid or expired OTP." });
+    }
+
+    if (new Date() > validOtp.expires_at) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    // Delete OTP so it cannot be reused
+    await validOtp.destroy({ transaction });
+
     const existingAlumni = isAlumni && email
       ? await alumniModel.findOne({ where: { email: finalEmail }, transaction })
       : null;

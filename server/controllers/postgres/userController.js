@@ -227,7 +227,7 @@ const updateUserStatus = async (req, res) => {
 
 const createUserByAdmin = async (req, res) => {
   try {
-    const { name, email, phone, password, role, college_name, department, event_id } = req.body;
+    const { name, email, phone, password, role, college_name, department, event_id, login_id } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ message: "Name, email, and password are required" });
     }
@@ -254,6 +254,13 @@ const createUserByAdmin = async (req, res) => {
       return res.status(400).json({ message: "User with this email already exists" });
     }
 
+    if (login_id) {
+      const existingLoginId = await userModel.findOne({ where: { login_id: login_id.trim() } });
+      if (existingLoginId) {
+        return res.status(400).json({ message: "User with this Login ID already exists" });
+      }
+    }
+
     const bcrypt = require("bcryptjs");
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -262,6 +269,7 @@ const createUserByAdmin = async (req, res) => {
       email: email.toLowerCase().trim(),
       phone: phone ? phone.trim() : "9876543210",
       password: hashedPassword,
+      login_id: login_id ? login_id.trim() : null,
       role: assignedRole,
       college_name: college_name ? college_name.trim() : "PSG College of Technology",
       department: department ? department.trim() : "Computer Applications",

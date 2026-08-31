@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { api } from '../services/api';
 import { ArrowRight, ShieldCheck, AlertCircle, Eye, EyeOff, Copy, Check, Calendar as CalendarIcon, Sparkles, Lock, Download } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { COLLEGES } from '../constants/colleges';
+import { PG_DEPARTMENTS } from '../constants/departments';
 
 // ──────────────────────────────────────────────
 // Zod Validation Schemas
@@ -13,6 +15,7 @@ import confetti from 'canvas-confetti';
 const participantSchema = z.object({
   name: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
+  otp: z.string().min(6, 'OTP must be 6 digits'),
   phone: z.string().min(10, 'WhatsApp mobile number is required (min 10 digits)'),
   college_name: z.string().min(2, 'College name is required'),
   department: z.string().optional(),
@@ -30,6 +33,7 @@ const participantSchema = z.object({
 const alumniSchema = z.object({
   name: z.string().min(2, 'Full name is required'),
   email: z.string().email('Please enter a valid email address'),
+  otp: z.string().min(6, 'OTP must be 6 digits'),
   phone: z.string().min(10, 'WhatsApp mobile number is required (min 10 digits)'),
   batch_year: z.string().min(1, 'Batch is required (e.g. 25MX)'),
   gender: z.string().min(1, 'Please select your gender'),
@@ -69,7 +73,7 @@ export const RegisterPage: React.FC = () => {
   const participantForm = useForm<ParticipantForm>({
     resolver: zodResolver(participantSchema),
     defaultValues: {
-      name: '', email: '', phone: '', college_name: '', department: '', roll_no: '',
+      name: '', email: '', otp: '', phone: '', college_name: '', department: '', roll_no: '',
       gender: '', year_of_study: '1st Year', accommodation_required: false, password: '', confirmPassword: '',
     },
   });
@@ -77,7 +81,7 @@ export const RegisterPage: React.FC = () => {
   const alumniForm = useForm<AlumniForm>({
     resolver: zodResolver(alumniSchema),
     defaultValues: {
-      name: '', email: '', phone: '', gender: '', batch_year: '', place: '', current_organization: '',
+      name: '', email: '', otp: '', phone: '', gender: '', batch_year: '', place: '', current_organization: '',
       accommodation_required: false,
     },
   });
@@ -107,6 +111,31 @@ export const RegisterPage: React.FC = () => {
       console.error('Failed to check email:', err);
     } finally {
       setCheckingEmail(false);
+    }
+  };
+
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpMessage, setOtpMessage] = useState<string | null>(null);
+
+  const handleSendOtp = async () => {
+    const email = (activeForm.getValues() as any).email as string;
+    if (!email || !email.includes('@')) {
+      setError('email', { type: 'manual', message: 'Enter a valid email first' });
+      return;
+    }
+    if (emailExistsError) return;
+
+    try {
+      setSendingOtp(true);
+      setOtpMessage(null);
+      await api.auth.sendOtp(email);
+      setOtpSent(true);
+      setOtpMessage('OTP sent successfully. Please check your inbox/spam.');
+    } catch (err: any) {
+      setServerError(err.response?.data?.message || 'Failed to send OTP');
+    } finally {
+      setSendingOtp(false);
     }
   };
 
@@ -416,38 +445,50 @@ END:VCALENDAR`;
               </div>
             </div>
 
-            {/* Email & Phone */}
+            {/* Email, OTP & Phone */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div className="col-span-1 sm:col-span-2">
                 <label className={labelClass}>Email Address *</label>
-                <input
-                  type="email"
-                  {...register('email')}
-                  onBlur={(e) => {
-                    register('email').onBlur(e);
-                    handleEmailBlur(e);
-                  }}
-                  placeholder="you@company.com"
-                  className={`${inputClass} ${emailExistsError ? 'border-[#E01B22] text-[#FF2A2A]' : ''}`}
-                />
-                {checkingEmail && (
-                  <p className="text-[10px] font-mono text-[#E08A17] mt-1 animate-pulse">
-                    Verifying email in database...
-                  </p>
-                )}
-                {(errors.email || emailExistsError) && (
-                  <p className={errorClass}>
-                    {emailExistsError || (errors.email as any).message}
-                  </p>
-                )}
-                {userType === 'ALUMNI' && !emailExistsError && (
-                  <p className="text-[10px] font-mono text-[#A79798] mt-1">
-                    We'll send your event confirmation & calendar reminder here.
-                  </p>
-                )}
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    {...register('email')}
+                    onBlur={(e) => {
+                      register('email').onBlur(e);
+                      handleEmailBlur(e);
+                    }}
+                    placeholder="you@college.edu"
+                    className={`${inputClass} flex-1 ${emailExistsError ? 'border-[#E01B22] text-[#FF2A2A]' : ''}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={sendingOtp || !!emailExistsError}
+                    className="px-3 sm:px-6 py-2.5 bg-[#1A0306] border border-[#E01B22] hover:bg-[#E01B22] text-[#F7F2F2] font-mono font-bold text-[10px] sm:text-xs uppercase rounded-[2px] transition-colors disabled:opacity-50 shrink-0"
+                  >
+                    {sendingOtp ? 'SENDING...' : otpSent ? 'RESEND OTP' : 'SEND OTP'}
+                  </button>
+                </div>
+                {checkingEmail && <p className="text-[10px] font-mono text-[#E08A17] mt-1 animate-pulse">Verifying email in database...</p>}
+                {(errors.email || emailExistsError) && <p className={errorClass}>{emailExistsError || (errors.email as any).message}</p>}
+                {otpMessage && <p className="text-[10px] font-mono text-[#1FA971] mt-1">{otpMessage}</p>}
               </div>
 
-              <div>
+              {otpSent && (
+                <div className="animate-fade-in">
+                  <label className={labelClass}>Enter OTP *</label>
+                  <input
+                    type="text"
+                    {...register('otp')}
+                    placeholder="6-digit code"
+                    className={inputClass}
+                    maxLength={6}
+                  />
+                  {errors.otp && <p className={errorClass}>{(errors.otp as any).message}</p>}
+                </div>
+              )}
+
+              <div className={otpSent ? "" : "sm:col-span-2"}>
                 <label className={labelClass}>WhatsApp Mobile Number *</label>
                 <input
                   type="text"
@@ -498,12 +539,18 @@ END:VCALENDAR`;
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className={labelClass}>College / Institution *</label>
-                    <input type="text" {...register('college_name')} placeholder="PSG College of Technology" className={inputClass} />
+                    <input list="colleges-list" type="text" {...register('college_name')} placeholder="Search or type college..." className={inputClass} />
+                    <datalist id="colleges-list">
+                      {COLLEGES.map((c) => <option key={c} value={c} />)}
+                    </datalist>
                     {errors.college_name && <p className={errorClass}>{(errors.college_name as any).message}</p>}
                   </div>
                   <div>
-                    <label className={labelClass}>Department / Stream</label>
-                    <input type="text" {...register('department')} placeholder="Computer Applications (MCA)" className={inputClass} />
+                    <label className={labelClass}>PG Department / Stream</label>
+                    <select {...register('department')} className={inputClass}>
+                      <option value="">Select PG Department (Optional)</option>
+                      {PG_DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>Roll / Reg No. (Optional)</label>
