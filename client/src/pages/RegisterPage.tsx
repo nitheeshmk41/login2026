@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { api } from '../services/api';
-import { ArrowRight, ShieldCheck, ShieldAlert, AlertCircle, Eye, EyeOff, Copy, Check, Calendar as CalendarIcon, Sparkles, Lock, Download } from 'lucide-react';
+import { ArrowRight, ShieldCheck, ShieldAlert, AlertCircle, Eye, EyeOff, Copy, Check, Calendar as CalendarIcon, Sparkles, Lock, Download, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PG_DEPARTMENTS } from '../constants/departments';
 import { CollegeCombobox } from '../components/common/CollegeCombobox';
@@ -628,11 +628,14 @@ END:VCALENDAR`;
             {/* CTA Submit Button */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-bold font-mono text-sm uppercase rounded-[2px] transition-all shadow-[0_0_20px_rgba(224,27,34,0.3)] flex items-center justify-center gap-3 disabled:opacity-60"
+              disabled={loading || sendingOtp}
+              className="w-full py-4 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-bold font-mono text-sm uppercase rounded-[2px] transition-all shadow-[0_0_20px_rgba(224,27,34,0.3)] flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                'PROCESSING REGISTRATION...'
+              {loading || sendingOtp ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#F7F2F2]" />
+                  <span>{sendingOtp ? 'SENDING OTP CODE...' : 'PROCESSING REGISTRATION...'}</span>
+                </div>
               ) : userType === 'ALUMNI' ? (
                 <>
                   <span>REGISTER AS ALUMNI →</span>
@@ -706,9 +709,16 @@ END:VCALENDAR`;
                 <button
                   onClick={handleVerifyAndRegister}
                   disabled={loading || otpValue.length !== 6}
-                  className="w-full py-3 bg-[#1FA971] hover:bg-[#158f5c] text-[#0A0607] font-bold font-mono text-sm uppercase rounded-[2px] transition-all disabled:opacity-50"
+                  className="w-full py-3 bg-[#1FA971] hover:bg-[#158f5c] text-[#0A0607] font-bold font-mono text-sm uppercase rounded-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {loading ? 'VERIFYING...' : 'VERIFY & REGISTER'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-[#0A0607]" />
+                      <span>VERIFYING & CREATING ACCOUNT...</span>
+                    </>
+                  ) : (
+                    'VERIFY & REGISTER'
+                  )}
                 </button>
                 <button
                   onClick={handleSendOtp}
