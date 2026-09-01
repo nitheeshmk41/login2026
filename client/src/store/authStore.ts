@@ -23,6 +23,10 @@ export interface UserProfile {
   is_active: boolean;
   hasPaidFee?: boolean;
   registrations?: any[];
+  gender?: string | null;
+  year_of_study?: string | null;
+  place?: string | null;
+  current_organization?: string | null;
   accommodation_required?: boolean;
 }
 

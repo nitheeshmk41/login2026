@@ -22,7 +22,7 @@ export default defineConfig({
     allowedHosts: ['login2k26-frontend', 'login.psgtech.ac.in'],
     proxy: {
       '/api': {
-        target: 'http://backend:5000',
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
     },

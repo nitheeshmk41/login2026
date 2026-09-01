@@ -87,6 +87,9 @@ export const TimelinePage: React.FC = () => {
             <p className="text-xs sm:text-sm text-[#A79798] leading-relaxed">
               Timeline map for 18 &amp; 19 September 2026. Review start times, durations, and parallel arenas.
             </p>
+            <div className="inline-flex items-center gap-2 bg-[#E08A17]/10 border border-[#E08A17]/40 px-3 py-1.5 rounded-[2px] text-xs font-mono text-[#E08A17] font-bold">
+              <span>⚠️ REGISTRATION RULE: Max 5 events allowed per participant with 0 schedule collisions.</span>
+            </div>
           </div>
 
           {/* View Mode Toggle: Gantt vs Card Flow */}

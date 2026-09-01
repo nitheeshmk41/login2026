@@ -26,6 +26,8 @@ const participantNavItems = [
 const adminNavItems = [
   { to: '/dashboard/admin', icon: LayoutDashboard, label: 'Overview', end: true },
   { to: '/dashboard/admin/users', icon: UserPlus, label: 'User Management' },
+  { to: '/dashboard/admin/coordinators', icon: Shield, label: 'Staff & Coordinators' },
+  { to: '/dashboard/admin/participants', icon: Users, label: 'Participants' },
   { to: '/dashboard/admin/registrations', icon: ClipboardList, label: 'Registrations' },
   { to: '/dashboard/admin/alumni', icon: GraduationCap, label: 'Alumni' },
   { to: '/dashboard/admin/payments', icon: CreditCard, label: 'Payments' },

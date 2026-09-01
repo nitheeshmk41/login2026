@@ -221,6 +221,8 @@ export const EventsPage: React.FC = () => {
     if (categoryParam === 'ONLINE') return e.is_online === true;
     if (categoryParam === 'TECHNICAL') return e.category === 'TECHNICAL' && !e.is_online;
     if (categoryParam === 'NON_TECHNICAL') return e.category === 'NON_TECHNICAL' && !e.is_online;
+    if (categoryParam === 'TEAM' || categoryParam === 'SQUAD') return e.team_type === 'TEAM' || e.max_team_size > 1;
+    if (categoryParam === 'SOLO') return e.team_type === 'INDIVIDUAL' && e.max_team_size <= 1;
     return true;
   }).sort((a, b) => {
     if (a.category === 'FLAGSHIP' && b.category !== 'FLAGSHIP') return -1;
@@ -238,7 +240,7 @@ export const EventsPage: React.FC = () => {
         <div className="sticky top-16 sm:top-20 z-30 bg-[#130C0E]/95 backdrop-blur-md border border-[#2A1A1D] p-3 sm:p-4 rounded-[2px] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-xl">
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-1 w-full sm:w-auto">
             <span className="mono-label text-[#E01B22] font-bold shrink-0 text-[10px] sm:text-xs mr-1">CATEGORIES:</span>
-            {['ALL', 'FLAGSHIP', 'ONLINE', 'TECHNICAL', 'NON_TECHNICAL'].map((cat) => (
+            {['ALL', 'FLAGSHIP', 'TECHNICAL', 'NON_TECHNICAL', 'SQUAD', 'SOLO', 'ONLINE'].map((cat) => (
               <button
                 key={cat}
                 onClick={() => handleCategoryChange(cat)}
@@ -247,12 +249,14 @@ export const EventsPage: React.FC = () => {
                   (cat === 'FLAGSHIP' && categoryParam === 'FLAGSHIP') ||
                   (cat === 'ONLINE' && categoryParam === 'ONLINE') ||
                   (cat === 'TECHNICAL' && categoryParam === 'TECHNICAL') ||
-                  (cat === 'NON_TECHNICAL' && categoryParam === 'NON_TECHNICAL')
+                  (cat === 'NON_TECHNICAL' && categoryParam === 'NON_TECHNICAL') ||
+                  (cat === 'SQUAD' && (categoryParam === 'SQUAD' || categoryParam === 'TEAM')) ||
+                  (cat === 'SOLO' && categoryParam === 'SOLO')
                     ? 'bg-[#E01B22] text-[#F7F2F2] border-[#E01B22]'
                     : 'bg-[#0A0607] text-[#A79798] border-[#2A1A1D] hover:border-[#A79798]'
                 }`}
               >
-                {cat === 'ALL' ? 'ALL ARENAS' : cat === 'FLAGSHIP' ? 'FLAGSHIP EVENT' : cat === 'ONLINE' ? 'ONLINE EVENTS' : cat === 'TECHNICAL' ? 'TECHNICAL' : 'NON-TECHNICAL'}
+                {cat === 'ALL' ? 'ALL ARENAS' : cat === 'FLAGSHIP' ? '★ FLAGSHIP' : cat === 'ONLINE' ? 'ONLINE' : cat === 'TECHNICAL' ? 'TECHNICAL' : cat === 'NON_TECHNICAL' ? 'NON-TECHNICAL' : cat === 'SQUAD' ? '👥 SQUAD' : '👤 SOLO'}
               </button>
             ))}
           </div>
@@ -277,110 +281,160 @@ export const EventsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Event Cards Grid */}
+        {/* Event Cards Grid — 1 column on mobile (<640px), 2 on tablet, 3 on desktop */}
         {filteredEvents.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8 items-stretch">
             {filteredEvents.map((event, idx) => {
               const detail = getEventDetail(event.name);
               const isRegistered = userRegistrations.includes(event.id);
+              const isTeam = event.team_type === 'TEAM' || event.max_team_size > 1;
 
               return (
                 <div
                   key={event.id}
-                  className={`bg-[#130C0E] rounded-[2px] flex flex-col card-hover-lift corner-bracket-container border animate-fade-in-up ${
+                  onClick={() => navigate(`/events/${(event as any).slug}`)}
+                  className={`group bg-[#130C0E] rounded-[2px] flex flex-col card-hover-lift corner-bracket-container border animate-fade-in-up cursor-pointer transition-all duration-300 ${
                     event.is_flagship
-                      ? 'border-[#E01B22] shadow-[0_0_25px_rgba(224,27,34,0.25)]'
-                      : 'border-[#2A1A1D] hover:border-[#E01B22]/50'
+                      ? 'border-[#E01B22] shadow-[0_0_25px_rgba(224,27,34,0.25)] hover:shadow-[0_0_35px_rgba(224,27,34,0.4)]'
+                      : 'border-[#2A1A1D] hover:border-[#E01B22]/60 shadow-xl hover:shadow-2xl hover:shadow-[#E01B22]/10'
                   }`}
-                  style={{ animationDelay: `${idx * 0.07}s` }}
+                  style={{ animationDelay: `${idx * 0.05}s` }}
                 >
                   <div className="corner-bracket-tl" />
                   <div className="corner-bracket-br" />
 
-                  {/* Guardian Art Frame */}
-                  <div className="p-5 bg-[#1A1114] border-b-2 border-[#3E2529] flex items-center justify-center scanlines h-48 relative overflow-hidden shadow-[inset_0_0_40px_rgba(224,27,34,0.06)]">
-                    {event.is_flagship && (
-                      <span className="absolute top-3 right-3 px-2.5 py-0.5 text-[10px] font-mono font-bold bg-[#E01B22] text-[#F7F2F2] rounded-[2px] animate-pulse-glow z-10">
-                        ★ FLAGSHIP
-                      </span>
-                    )}
-                    <img
-                      src={event.guardian_asset || '/assets/login.png'}
-                      alt={`${detail.guardianName} Guardian`}
-                      className="max-h-36 w-auto object-contain animate-float-slow drop-shadow-[0_0_20px_rgba(224,27,34,0.2)]"
-                    />
-                  </div>
+                  {/* Compact Mobile Layout (< sm) */}
+                  <div className="sm:hidden p-3.5 flex gap-3.5 items-center">
+                    <div className="w-24 h-24 bg-[#1A1114] border border-[#3E2529] rounded-[2px] shrink-0 flex items-center justify-center relative overflow-hidden">
+                      {event.is_flagship && (
+                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E01B22] animate-pulse" title="Flagship Event" />
+                      )}
+                      <img
+                        src={event.guardian_asset || '/assets/login.png'}
+                        alt={`${detail.guardianName} Guardian`}
+                        className="max-h-16 w-auto object-contain drop-shadow-[0_0_10px_rgba(224,27,34,0.3)]"
+                      />
+                    </div>
 
-                  {/* Clean Card Body Format */}
-                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                    <div>
-                      <h2 className="text-xl font-display font-bold text-[#F7F2F2] hover:text-[#E01B22] transition-colors leading-tight">
+                    <div className="flex-1 min-w-0 space-y-1.5 font-mono">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-[1px] tracking-wider uppercase ${
+                          event.category === 'FLAGSHIP' ? 'bg-[#E01B22] text-white' : 'bg-[#E01B22]/15 text-[#FF2A2A] border border-[#E01B22]/30'
+                        }`}>
+                          {event.category === 'FLAGSHIP' ? '★ FLAGSHIP' : event.is_online ? 'ONLINE' : event.category}
+                        </span>
+                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-[1px] ${
+                          isTeam ? 'bg-[#E08A17]/10 text-[#E08A17] border border-[#E08A17]/30' : 'bg-[#1FA971]/10 text-[#1FA971] border border-[#1FA971]/30'
+                        }`}>
+                          {isTeam ? `👥 SQUAD (${event.min_team_size || 2}-${event.max_team_size || 2})` : '👤 SOLO'}
+                        </span>
+                      </div>
+
+                      <h2 className="text-base font-display font-bold text-[#F7F2F2] group-hover:text-[#E01B22] transition-colors leading-snug truncate">
                         {event.name}
                       </h2>
 
-                      <div className="text-xs font-mono font-semibold text-[#FF2A2A] mt-1">
-                        {event.category === 'FLAGSHIP' ? 'Flagship Event' : event.is_online ? 'Online Event' : (event.category === 'TECHNICAL' ? 'Technical' : 'Non-Technical')} • {(event.team_type === 'TEAM' || event.max_team_size > 1) ? `${event.min_team_size || 2}${event.max_team_size > (event.min_team_size || 1) ? `–${event.max_team_size}` : ''} Members` : 'Individual'} • {detail.durationText}
+                      <div className="text-[10px] text-[#A79798] flex items-center justify-between pt-1 border-t border-[#2A1A1D]/40">
+                        <span>{detail.durationText}</span>
+                        {isRegistered ? (
+                          <span className="text-[#1FA971] font-bold flex items-center gap-0.5">
+                            <CheckCircle2 className="w-3 h-3" /> REGISTERED
+                          </span>
+                        ) : (
+                          <span className="text-[#E01B22] font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-0.5">
+                            VIEW DETAILS →
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Standard Tablet & Desktop Layout (>= sm) */}
+                  <div className="hidden sm:flex flex-col flex-1 justify-between">
+                    {/* Guardian Art Frame */}
+                    <div className="p-5 bg-[#1A1114] border-b-2 border-[#3E2529] flex items-center justify-center scanlines h-48 relative overflow-hidden shadow-[inset_0_0_40px_rgba(224,27,34,0.06)]">
+                      {event.is_flagship && (
+                        <span className="absolute top-3 right-3 px-2.5 py-0.5 text-[10px] font-mono font-bold bg-[#E01B22] text-[#F7F2F2] rounded-[2px] animate-pulse-glow z-10">
+                          ★ FLAGSHIP
+                        </span>
+                      )}
+                      <img
+                        src={event.guardian_asset || '/assets/login.png'}
+                        alt={`${detail.guardianName} Guardian`}
+                        className="max-h-36 w-auto object-contain animate-float-slow drop-shadow-[0_0_20px_rgba(224,27,34,0.2)]"
+                      />
+                    </div>
+
+                    {/* Card Body Format */}
+                    <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                      <div>
+                        <h2 className="text-xl font-display font-bold text-[#F7F2F2] group-hover:text-[#E01B22] transition-colors leading-tight">
+                          {event.name}
+                        </h2>
+
+                        <div className="text-xs font-mono font-semibold text-[#FF2A2A] mt-1">
+                          {event.category === 'FLAGSHIP' ? 'Flagship Event' : event.is_online ? 'Online Event' : (event.category === 'TECHNICAL' ? 'Technical' : 'Non-Technical')} • {(event.team_type === 'TEAM' || event.max_team_size > 1) ? `${event.min_team_size || 2}${event.max_team_size > (event.min_team_size || 1) ? `–${event.max_team_size}` : ''} Members` : 'Individual'} • {detail.durationText}
+                        </div>
+
+                        <p className="text-xs text-[#A79798] leading-relaxed mt-3 line-clamp-3">
+                          {event.description || detail.shortDesc}
+                        </p>
+
+                        {detail.skills && detail.skills.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-[#2A1A1D]/60 flex flex-wrap gap-1.5">
+                            {detail.skills.map((skill, sIdx) => (
+                              <span key={sIdx} className="px-2 py-0.5 text-[10px] font-mono bg-[#1A1114] text-[#F7F2F2]/80 border border-[#3E2529] rounded-[2px]">
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      <p className="text-xs text-[#A79798] leading-relaxed mt-3 line-clamp-3">
-                        {event.description || detail.shortDesc}
-                      </p>
+                      <div className="pt-4 border-t border-[#2A1A1D] flex items-center justify-between gap-2 mt-auto">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/events/${(event as any).slug}`); }}
+                          className="px-3.5 py-2 text-xs font-mono font-semibold border border-[#2A1A1D] hover:border-[#A79798] text-[#A79798] hover:text-[#F7F2F2] rounded-[2px] transition-colors"
+                        >
+                          View Details
+                        </button>
 
-                      {detail.skills && detail.skills.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-[#2A1A1D]/60 flex flex-wrap gap-1.5">
-                          {detail.skills.map((skill, sIdx) => (
-                            <span key={sIdx} className="px-2 py-0.5 text-[10px] font-mono bg-[#1A1114] text-[#F7F2F2]/80 border border-[#3E2529] rounded-[2px]">
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                        {user?.role === 'admin' || user?.role === 'coordinator' ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(user?.role === 'coordinator' ? '/coordinator' : '/admin'); }}
+                            className="px-3.5 py-2 bg-[#1A1114] border border-[#3E2529] hover:border-[#E08A17] text-[#E08A17] hover:text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors"
+                          >
+                            Manage Event
+                          </button>
+                        ) : event.is_flagship ? (
+                          <span className="px-3.5 py-2 bg-[#1A1114] border border-[#E01B22] text-[#E01B22] font-mono text-xs font-bold rounded-[2px]">
+                            Invite-Only
+                          </span>
+                        ) : event.status !== 'open' ? (
+                          <span className="px-4 py-2 bg-[#130C0E] border border-[#2A1A1D] text-[#A79798] font-mono text-xs font-bold uppercase rounded-[2px] cursor-not-allowed">
+                            Registration Filled
+                          </span>
+                        ) : !isAuthenticated ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate('/login'); }}
+                            className="px-4 py-2 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors shadow-md"
+                          >
+                            Register Now
+                          </button>
+                        ) : isRegistered ? (
+                          <span className="chip-registered px-3.5 py-2 flex items-center gap-1 text-xs font-mono">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Registered ✓
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/events/${(event as any).slug}`); }}
+                            className="px-4 py-2 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors shadow-md"
+                          >
+                            Register Now
+                          </button>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="pt-4 border-t border-[#2A1A1D] flex items-center justify-between gap-2 mt-auto">
-                      <button
-                        onClick={() => navigate(`/events/${(event as any).slug}`)}
-                        className="px-3.5 py-2 text-xs font-mono font-semibold border border-[#2A1A1D] hover:border-[#A79798] text-[#A79798] hover:text-[#F7F2F2] rounded-[2px] transition-colors"
-                      >
-                        View Details
-                      </button>
-
-                      {user?.role === 'admin' || user?.role === 'coordinator' ? (
-                        <button
-                          onClick={() => navigate(user?.role === 'coordinator' ? '/coordinator' : '/admin')}
-                          className="px-3.5 py-2 bg-[#1A1114] border border-[#3E2529] hover:border-[#E08A17] text-[#E08A17] hover:text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors"
-                        >
-                          Manage Event
-                        </button>
-                      ) : event.is_flagship ? (
-                        <span className="px-3.5 py-2 bg-[#1A1114] border border-[#E01B22] text-[#E01B22] font-mono text-xs font-bold rounded-[2px]">
-                          Invite-Only
-                        </span>
-                      ) : event.status !== 'open' ? (
-                        <span className="px-4 py-2 bg-[#130C0E] border border-[#2A1A1D] text-[#A79798] font-mono text-xs font-bold uppercase rounded-[2px] cursor-not-allowed">
-                          Registration Filled
-                        </span>
-                      ) : !isAuthenticated ? (
-                        <button
-                          onClick={() => navigate('/login')}
-                          className="px-4 py-2 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors shadow-md"
-                        >
-                          Register Now
-                        </button>
-                      ) : isRegistered ? (
-                        <span className="chip-registered px-3.5 py-2 flex items-center gap-1 text-xs font-mono">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Registered ✓
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => navigate(`/events/${(event as any).slug}`)}
-                          className="px-4 py-2 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors shadow-md"
-                        >
-                          Register Now
-                        </button>
-                      )}
-                    </div>
-
                   </div>
                 </div>
               );

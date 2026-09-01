@@ -157,3 +157,12 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 ./cred.txt
 cred.txt
 .cred.text
+
+# ──────────────────────────────────────────
+# 🔒 Sensitive Data & Debug Files
+# ──────────────────────────────────────────
+PayDetails.xlsx
+server/logs.json
+server/logs2.json
+server/logs3.json
+server/vercel_logs.txt

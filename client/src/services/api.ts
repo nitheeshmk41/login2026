@@ -56,10 +56,11 @@ export const api = {
 
   // Event Registration Module
   registrations: {
-    register: async (data: { event_id: number | string; team_name?: string; team_members?: any[] }) => await axiosInstance.post('/registrations/', data),
+    register: async (data: { event_id: number | string; team_name?: string; team_id?: number | string; team_members?: any[] }) => await axiosInstance.post('/registrations/', data),
     getMyRegistrations: async () => await axiosInstance.get('/registrations/my'),
     getEventRegistrations: async (eventId: number | string) => await axiosInstance.get(`/registrations/event/${eventId}`),
     cancel: async (id: number | string) => await axiosInstance.put(`/registrations/${id}/cancel`),
+    deregister: async (eventId: number | string) => await axiosInstance.delete(`/registrations/event/${eventId}`),
   },
 
   // Payment Module
@@ -103,6 +104,7 @@ export const api = {
     // Team Management
     registerTeam: async (teamId: number | string) => await axiosInstance.post(`/teams/${teamId}/register`),
     removeMember: async (teamId: number | string, userId: number | string) => await axiosInstance.delete(`/teams/${teamId}/members/${userId}`),
+    delete: async (teamId: number | string) => await axiosInstance.delete(`/teams/${teamId}`),
   },
 
   // Attendance Module

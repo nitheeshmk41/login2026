@@ -66,7 +66,7 @@ export const MyRegistrationsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-4 font-mono text-[#A79798]">
-                      <div className="flex items-center gap-1.5"><Calendar className="w-3 h-3" />Day {reg.event?.day || 18}</div>
+                      <div className="flex items-center gap-1.5"><Calendar className="w-3 h-3" />{(Number(reg.event?.day) === 2 || Number(reg.event?.day) === 19 || Number(reg.event?.day) === 15) ? 'Day 2' : 'Day 1'}</div>
                       <div className="flex items-center gap-1.5 mt-1"><Clock className="w-3 h-3" />{reg.event?.start_time?.slice(0, 5)} – {reg.event?.end_time?.slice(0, 5)}</div>
                     </td>
                     <td className="p-4 font-mono">

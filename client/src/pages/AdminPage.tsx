@@ -10,19 +10,21 @@ const STATIC_EVENTS = Array.isArray(staticEventsData) ? staticEventsData : [];
 export const AdminPage: React.FC = () => {
   const { section } = useParams<{ section?: string }>();
 
-  type AdminTab = 'PAYMENTS' | 'REGISTRATIONS' | 'ALUMNI' | 'USERS' | 'DASHBOARD' | 'ANNOUNCEMENTS' | 'EVENTS' | 'CSV_UPLOAD' | 'SETTINGS';
+  type AdminTab = 'PAYMENTS' | 'REGISTRATIONS' | 'ALUMNI' | 'USERS' | 'DASHBOARD' | 'ANNOUNCEMENTS' | 'EVENTS' | 'CSV_UPLOAD' | 'SETTINGS' | 'COORDINATORS' | 'PARTICIPANTS';
 
   const sectionToTab = (s?: string): AdminTab => {
     switch (s) {
       case 'users': return 'USERS';
+      case 'coordinators': return 'COORDINATORS';
+      case 'participants': return 'PARTICIPANTS';
       case 'registrations': return 'REGISTRATIONS';
       case 'alumni': return 'ALUMNI';
       case 'payments': return 'PAYMENTS';
-      case 'csv-upload': return 'CSV_UPLOAD';
       case 'events': return 'EVENTS';
+      case 'csv-upload': return 'CSV_UPLOAD';
       case 'announcements': return 'ANNOUNCEMENTS';
       case 'settings': return 'SETTINGS';
-      default: return 'PAYMENTS';
+      default: return 'DASHBOARD';
     }
   };
 
@@ -73,6 +75,27 @@ export const AdminPage: React.FC = () => {
   // Edit User Modal State
   const [editModalUser, setEditModalUser] = useState<any>(null);
 
+  // User List Filters
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('ALL');
+  const [participantFilter, setParticipantFilter] = useState<'ALL' | 'ACCOMMODATION' | 'PAID' | 'UNPAID'>('ALL');
+
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter(u => u.user_type !== 'ALUMNI')
+      .filter(u => userRoleFilter === 'ALL' || u.role === userRoleFilter)
+      .filter(u => {
+        if (!userSearch) return true;
+        const s = userSearch.toLowerCase();
+        return (
+          u.name?.toLowerCase().includes(s) ||
+          u.email?.toLowerCase().includes(s) ||
+          u.phone?.toLowerCase().includes(s) ||
+          u.college_name?.toLowerCase().includes(s)
+        );
+      });
+  }, [users, userRoleFilter, userSearch]);
+
   const eventOptions = useMemo(() => (events.length ? events : STATIC_EVENTS), [events]);
 
   const fetchData = async () => {
@@ -117,6 +140,25 @@ export const AdminPage: React.FC = () => {
   useEffect(() => {
     setActiveTab(sectionToTab(section));
   }, [section]);
+
+  // Auto-generate Login ID based on event selection
+  useEffect(() => {
+    if (['coordinator', 'registration_desk'].includes(newUserRole) && newUserEventId) {
+      const ev = eventOptions.find(e => String(e.id) === String(newUserEventId));
+      if (ev) {
+        const cleanName = ev.name.replace(/\[.*?\]\s*/, '').trim();
+        const initials = cleanName.split(' ').map((w: string) => w[0]).join('').toUpperCase();
+        
+        // Find existing coordinators for this event to determine the next index
+        const existingCount = users.filter(u => 
+          u.eventAssignments?.some((ea: any) => String(ea.event_id) === String(newUserEventId))
+        ).length;
+        
+        const nextIdx = String(existingCount + 1).padStart(2, '0');
+        setNewUserLoginId(`LOGIN_EVT_${initials}_${nextIdx}`);
+      }
+    }
+  }, [newUserEventId, newUserRole, eventOptions, users]);
 
   // CSV Upload handlers
   const handleCsvUpload = async () => {
@@ -189,7 +231,7 @@ export const AdminPage: React.FC = () => {
         email: newUserEmail.trim(),
         phone: newUserPhone.trim() || '9876543210',
         password: newUserPassword,
-        role: newUserRole,
+        role: newUserRole.toLowerCase().trim(),
         event_id: requiresEventAssignment ? Number(newUserEventId) : undefined,
         college_name: newUserCollege.trim(),
         department: newUserDepartment.trim(),
@@ -258,7 +300,7 @@ export const AdminPage: React.FC = () => {
 
   const handleRoleChange = async (userId: number, role: string) => {
     try {
-      await api.users.updateRole(userId, role);
+      await api.users.updateRole(userId, role.toLowerCase().trim());
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update user role.');
@@ -452,8 +494,41 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const exportAccommodationCSV = () => {
+    const list = users.filter((u) => u.accommodation_required);
+    if (!list.length) {
+      alert('No participants or alumni have requested accommodation.');
+      return;
+    }
+    const csvRows = [
+      ['ID_CODE', 'NAME', 'EMAIL', 'PHONE', 'COLLEGE', 'DEPARTMENT', 'ROLL_NO', 'USER_TYPE', 'ROLE'],
+      ...list.map((u) => [
+        u.student_id_code || u.login_id || u.id,
+        u.name || '',
+        u.email || '',
+        u.phone || '',
+        u.college_name || '',
+        u.department || '',
+        u.roll_no || '',
+        u.user_type || 'PARTICIPANT',
+        u.role || 'participant'
+      ])
+    ];
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map((e) => e.map((cell) => `"${cell}"`).join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `LOGIN_2K26_Accommodation_Requests_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Telemetry Calculations
   const totalStudents = users.filter((u) => u.role === 'participant').length;
+  const accommodationCount = users.filter((u) => u.accommodation_required).length;
+  const alumniCount = users.filter((u) => u.user_type === 'ALUMNI').length;
   const verifiedPaymentsCount = payments.filter((p) => p.status === 'VERIFIED').length;
   
   let totalEnrollments = 0;
@@ -487,6 +562,8 @@ export const AdminPage: React.FC = () => {
           {activeTab === 'REGISTRATIONS' && 'Event-Wise Participant Roster'}
           {activeTab === 'ALUMNI' && 'Alumni Roster'}
           {activeTab === 'USERS' && 'Create / Manage Accounts'}
+          {activeTab === 'COORDINATORS' && 'Staff & Event Coordinators'}
+          {activeTab === 'PARTICIPANTS' && 'Participant Registry & Payment Status'}
           {activeTab === 'DASHBOARD' && 'Telemetry & Stats'}
           {activeTab === 'ANNOUNCEMENTS' && 'Broadcast Announcements'}
           {activeTab === 'EVENTS' && `Events (${events.length})`}
@@ -609,7 +686,7 @@ export const AdminPage: React.FC = () => {
                       </td>
                       <td className="p-3.5">
                         {p.receipt_url ? (
-                          <a href={p.receipt_url.startsWith('http') ? p.receipt_url : `${ENV.API_ROOT_URL}${p.receipt_url}`} target="_blank" rel="noreferrer" className="text-[#6366F1] hover:text-[#818CF8] font-mono text-[10px] font-bold flex items-center gap-1 transition-colors">
+                          <a href={`${ENV.API_ROOT_URL}/api/payments/receipt/${p.id}`} target="_blank" rel="noreferrer" className="text-[#6366F1] hover:text-[#818CF8] font-mono text-[10px] font-bold flex items-center gap-1 transition-colors">
                             VIEW RECEIPT ↗
                           </a>
                         ) : (
@@ -890,10 +967,10 @@ export const AdminPage: React.FC = () => {
                       onChange={(e) => setNewUserRole(e.target.value)}
                       className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-2.5 rounded-[2px] outline-none font-mono"
                     >
-                      <option value="coordinator">coordinator</option>
-                      <option value="registration_desk">registration_desk</option>
-                      <option value="admin">admin</option>
-                      <option value="participant">participant</option>
+                      <option value="coordinator">COORDINATOR</option>
+                      <option value="registration_desk">REGISTRATION DESK</option>
+                      <option value="admin">ADMIN</option>
+                      <option value="participant">PARTICIPANT</option>
                     </select>
                   </div>
                   {['coordinator', 'registration_desk'].includes(newUserRole) && (
@@ -905,9 +982,11 @@ export const AdminPage: React.FC = () => {
                         required
                         className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-2.5 rounded-[2px] outline-none font-mono"
                       >
-                        <option value="">Select one event</option>
+                        <option value="">-- Assign an event to manage --</option>
                         {eventOptions.map((event) => (
-                          <option key={event.id} value={event.id}>{event.name}</option>
+                          <option key={event.id} value={event.id}>
+                            [{event.category === 'NON_TECHNICAL' ? 'NON-TECH' : 'TECH'}] {event.name.toUpperCase()}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -944,61 +1023,97 @@ export const AdminPage: React.FC = () => {
 
             {/* User Management Table */}
             <div className="bg-[#130C0E] border border-[#2A1A1D] p-6 rounded-[2px] space-y-6">
-              <h2 className="text-lg font-display font-bold text-[#F7F2F2]">
-                ALL USERS & AUTHORIZED PERSONNEL ({users.filter(u => u.user_type !== 'ALUMNI').length})
-              </h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-lg font-display font-bold text-[#F7F2F2]">
+                  ALL USERS & AUTHORIZED PERSONNEL ({filteredUsers.length})
+                </h2>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search name, email, college..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] px-3 py-1.5 rounded-[2px] text-xs font-mono outline-none w-64"
+                  />
+                  <select
+                    value={userRoleFilter}
+                    onChange={(e) => setUserRoleFilter(e.target.value)}
+                    className="bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] px-3 py-1.5 rounded-[2px] text-xs font-mono outline-none"
+                  >
+                    <option value="ALL">ALL ROLES</option>
+                    <option value="participant">Participant</option>
+                    <option value="admin">Admin</option>
+                    <option value="coordinator">Coordinator</option>
+                    <option value="registration_desk">Registration Desk</option>
+                  </select>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs font-body">
                   <thead className="bg-[#0A0607] text-[#6B5A5C] font-mono border-b border-[#3E2529]">
                     <tr>
                       <th className="p-3.5">ID</th>
                       <th className="p-3.5">NAME &amp; EMAIL</th>
-                      <th className="p-3.5">DEPARTMENT</th>
-                      <th className="p-3.5">ASSIGNED EVENT</th>
-                      <th className="p-3.5">ASSIGNED ROLE</th>
-                      <th className="p-3.5">CHANGE ROLE</th>
+                      <th className="p-3.5">COLLEGE &amp; DEPT</th>
+                      <th className="p-3.5">REG. TIME</th>
+                      <th className="p-3.5">ASSIGNED ROLE / EVENT</th>
+                      <th className="p-3.5">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#2A1A1D]">
-                    {users.filter(u => u.user_type !== 'ALUMNI').map((u) => (
+                    {filteredUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-[#1A1114] transition-colors">
                         <td className="p-3.5 font-mono text-[#6B5A5C]">#{u.id}</td>
                         <td className="p-3.5">
                           <div className="font-bold text-[#F7F2F2]">{u.name}</div>
                           <div className="text-[10px] text-[#A79798] font-mono">{u.email} &bull; {u.phone || '-'}</div>
                         </td>
-                        <td className="p-3.5 font-mono text-[#A79798]">{u.department || 'Computer Applications'}</td>
-                        <td className="p-3.5 font-mono text-[#E08A17]">
-                          {['coordinator', 'registration_desk'].includes(u.role)
-                            ? (u.eventAssignments?.[0]?.event?.name || 'Unassigned')
-                            : '-'}
+                        <td className="p-3.5">
+                          <div className="font-bold text-[#E08A17] max-w-[200px] truncate" title={u.college_name}>{u.college_name || 'PSG College of Technology'}</div>
+                          <div className="text-[10px] text-[#A79798] font-mono">{u.department || 'Computer Applications'}</div>
                         </td>
-                        <td className="p-3.5 font-mono text-[#FF2A2A] font-bold uppercase">{u.role}</td>
+                        <td className="p-3.5 font-mono text-[#A79798] text-[10px]">
+                          {u.createdAt ? new Date(u.createdAt).toLocaleString() : '-'}
+                        </td>
+                        <td className="p-3.5">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            className="bg-[#0A0607] border border-[#2A1A1D] text-[#FF2A2A] px-2 py-1 rounded-[2px] text-xs font-mono font-bold uppercase outline-none mb-1 block w-full"
+                          >
+                            <option value="coordinator">COORDINATOR</option>
+                            <option value="registration_desk">REGISTRATION DESK</option>
+                            <option value="admin">ADMIN</option>
+                            <option value="participant">PARTICIPANT</option>
+                          </select>
+                          {['coordinator', 'registration_desk'].includes(u.role) && (
+                            <div className="text-[10px] text-[#E08A17] font-mono">
+                              Evt: {u.eventAssignments?.[0]?.event?.name || 'None'}
+                            </div>
+                          )}
+                        </td>
                         <td className="p-3.5">
                           <div className="flex items-center gap-2">
-                            <select
-                              value={u.role}
-                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                              className="bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] px-2.5 py-1 rounded-[2px] text-xs font-mono outline-none"
+                            <a
+                              href={`mailto:${u.email}`}
+                              className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#1FA971] text-[#1FA971] text-[10px] font-bold font-mono rounded-[2px] transition-colors flex items-center"
+                              title="Send Email"
                             >
-                            <option value="coordinator">coordinator</option>
-                            <option value="registration_desk">registration_desk</option>
-                            <option value="admin">admin</option>
-                            <option value="participant">participant</option>
-                          </select>
-                          <button
-                            onClick={() => setEditModalUser(u)}
-                            className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E08A17] text-[#E08A17] text-[10px] font-bold font-mono rounded-[2px] transition-colors"
-                          >
-                            EDIT
-                          </button>
-                          <button
-                            onClick={() => deleteManagedUser(u)}
-                            className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E01B22] text-[#E01B22] text-[10px] font-bold font-mono rounded-[2px] transition-colors"
-                          >
-                            DELETE
-                          </button>
-                        </div>
+                              MAIL
+                            </a>
+                            <button
+                              onClick={() => setEditModalUser(u)}
+                              className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E08A17] text-[#E08A17] text-[10px] font-bold font-mono rounded-[2px] transition-colors"
+                            >
+                              EDIT
+                            </button>
+                            <button
+                              onClick={() => deleteManagedUser(u)}
+                              className="px-2.5 py-1 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E01B22] text-[#E01B22] text-[10px] font-bold font-mono rounded-[2px] transition-colors"
+                            >
+                              DELETE
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1009,30 +1124,185 @@ export const AdminPage: React.FC = () => {
           </div>
         )}
 
+        {/* NEW TAB: COORDINATORS */}
+        {activeTab === 'COORDINATORS' && (
+          <div className="bg-[#130C0E] border border-[#2A1A1D] p-6 rounded-[2px] space-y-6">
+            <h2 className="text-lg font-display font-bold text-[#F7F2F2]">
+              STAFF & EVENT COORDINATORS
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-body">
+                <thead className="bg-[#0A0607] text-[#6B5A5C] font-mono border-b border-[#3E2529]">
+                  <tr>
+                    <th className="p-3.5">ID</th>
+                    <th className="p-3.5">NAME &amp; EMAIL</th>
+                    <th className="p-3.5">ROLE</th>
+                    <th className="p-3.5">ASSIGNED EVENT</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#2A1A1D]">
+                  {users.filter(u => ['coordinator', 'registration_desk'].includes(u.role)).map((u) => (
+                    <tr key={u.id} className="hover:bg-[#1A1114] transition-colors">
+                      <td className="p-3.5 font-mono text-[#6B5A5C]">#{u.id}</td>
+                      <td className="p-3.5">
+                        <div className="font-bold text-[#F7F2F2]">{u.name}</div>
+                        <div className="text-[10px] text-[#A79798] font-mono">{u.email}</div>
+                      </td>
+                      <td className="p-3.5 font-mono text-[#FF2A2A] font-bold uppercase">{u.role}</td>
+                      <td className="p-3.5 font-mono text-[#E08A17]">
+                        {u.eventAssignments?.[0]?.event?.name || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* NEW TAB: PARTICIPANTS */}
+        {activeTab === 'PARTICIPANTS' && (
+          <div className="bg-[#130C0E] border border-[#2A1A1D] p-6 rounded-[2px] space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#2A1A1D] pb-4">
+              <div>
+                <h2 className="text-lg font-display font-bold text-[#F7F2F2]">
+                  PARTICIPANT REGISTRY &amp; ACCOMMODATION STATUS
+                </h2>
+                <p className="text-xs text-[#A79798] font-mono mt-0.5">
+                  Filter participants, view accommodation requests, and track payment status.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setParticipantFilter('ALL')}
+                  className={`px-3 py-1.5 font-mono text-xs font-bold rounded-[2px] transition-colors ${
+                    participantFilter === 'ALL' ? 'bg-[#E01B22] text-white' : 'bg-[#1A1114] text-[#A79798] hover:text-white border border-[#2A1A1D]'
+                  }`}
+                >
+                  ALL ({users.filter(u => u.role === 'participant').length})
+                </button>
+                <button
+                  onClick={() => setParticipantFilter('ACCOMMODATION')}
+                  className={`px-3 py-1.5 font-mono text-xs font-bold rounded-[2px] transition-colors ${
+                    participantFilter === 'ACCOMMODATION' ? 'bg-[#E01B22] text-white' : 'bg-[#1A1114] text-[#E01B22] hover:text-white border border-[#E01B22]/40'
+                  }`}
+                >
+                  🏠 ACCOMMODATION ({users.filter(u => u.role === 'participant' && u.accommodation_required).length})
+                </button>
+                <button
+                  onClick={() => setParticipantFilter('PAID')}
+                  className={`px-3 py-1.5 font-mono text-xs font-bold rounded-[2px] transition-colors ${
+                    participantFilter === 'PAID' ? 'bg-[#1FA971] text-black' : 'bg-[#1A1114] text-[#1FA971] hover:text-white border border-[#1FA971]/40'
+                  }`}
+                >
+                  PAID ({users.filter(u => u.role === 'participant' && u.payments?.some((p: any) => p.status === 'VERIFIED')).length})
+                </button>
+                <button
+                  onClick={exportAccommodationCSV}
+                  className="px-3.5 py-1.5 bg-[#1A1114] hover:bg-[#2A1A1D] border border-[#3E2529] hover:border-[#E01B22] text-[#F7F2F2] font-mono text-xs font-bold rounded-[2px] flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#E01B22]" /> EXPORT ACCOMMODATION CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-body">
+                <thead className="bg-[#0A0607] text-[#6B5A5C] font-mono border-b border-[#3E2529]">
+                  <tr>
+                    <th className="p-3.5">ID</th>
+                    <th className="p-3.5">NAME &amp; EMAIL</th>
+                    <th className="p-3.5">COLLEGE &amp; DEPT</th>
+                    <th className="p-3.5">PHONE / ROLL NO</th>
+                    <th className="p-3.5">ACCOMMODATION</th>
+                    <th className="p-3.5">PAYMENT STATUS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#2A1A1D]">
+                  {users
+                    .filter((u) => u.role === 'participant')
+                    .filter((u) => {
+                      if (participantFilter === 'ACCOMMODATION') return u.accommodation_required;
+                      if (participantFilter === 'PAID') return u.payments?.some((p: any) => p.status === 'VERIFIED');
+                      if (participantFilter === 'UNPAID') return !u.payments?.some((p: any) => p.status === 'VERIFIED');
+                      return true;
+                    })
+                    .map((u) => {
+                      const isPaid = u.payments?.some((p: any) => p.status === 'VERIFIED');
+                      const isPending = u.payments?.some((p: any) => p.status === 'PENDING' || p.status === 'review');
+                      let statusLabel = isPaid ? 'PAID' : isPending ? 'PENDING' : 'UNPAID';
+                      let statusColor = isPaid ? 'text-[#1FA971]' : isPending ? 'text-[#E08A17]' : 'text-[#E01B22]';
+                      return (
+                        <tr key={u.id} className="hover:bg-[#1A1114] transition-colors">
+                          <td className="p-3.5 font-mono text-[#6B5A5C]">#{u.student_id_code || u.id}</td>
+                          <td className="p-3.5">
+                            <div className="font-bold text-[#F7F2F2]">{u.name}</div>
+                            <div className="text-[10px] text-[#A79798] font-mono">{u.email}</div>
+                          </td>
+                          <td className="p-3.5">
+                            <div className="font-bold text-[#E08A17] max-w-[200px] truncate" title={u.college_name}>
+                              {u.college_name || 'PSG Tech'}
+                            </div>
+                            <div className="text-[10px] text-[#A79798]">{u.department || '-'}</div>
+                          </td>
+                          <td className="p-3.5 font-mono text-[#A79798]">
+                            <div>{u.phone || '-'}</div>
+                            <div className="text-[10px] text-[#6B5A5C]">{u.roll_no || '-'}</div>
+                          </td>
+                          <td className="p-3.5 font-mono">
+                            {u.accommodation_required ? (
+                              <span className="px-2 py-0.5 rounded-[2px] text-[10px] font-bold bg-[#E01B22]/20 text-[#FF2A2A] border border-[#E01B22]">
+                                🏠 REQUIRED
+                              </span>
+                            ) : (
+                              <span className="text-[#6B5A5C]">NOT NEEDED</span>
+                            )}
+                          </td>
+                          <td className={`p-3.5 font-mono font-bold ${statusColor}`}>{statusLabel}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* TAB 4: SYMPOSIUM TELEMETRY & ATTENDANCE DASHBOARD */}
         {activeTab === 'DASHBOARD' && (
           <div className="space-y-6">
             {/* Top KPI Metrics Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#130C0E] border border-[#2A1A1D] p-5 rounded-[2px]">
-                <span className="mono-label text-[#A79798] block">REGISTERED STUDENTS</span>
-                <strong className="text-2xl font-mono text-[#F7F2F2] mt-1 block">{totalStudents}</strong>
-                <span className="text-[10px] text-[#A79798] font-mono">Symposium accounts</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="bg-[#130C0E] border border-[#2A1A1D] p-4 rounded-[2px]">
+                <span className="mono-label text-[#A79798] block text-[10px]">PARTICIPANTS</span>
+                <strong className="text-xl font-mono text-[#F7F2F2] mt-1 block">{totalStudents}</strong>
+                <span className="text-[9px] text-[#A79798] font-mono">Symposium accounts</span>
               </div>
-              <div className="bg-[#130C0E] border border-[#1FA971]/40 p-5 rounded-[2px]">
-                <span className="mono-label text-[#1FA971] block">PAYMENTS VERIFIED</span>
-                <strong className="text-2xl font-mono text-[#1FA971] mt-1 block">{verifiedPaymentsCount}</strong>
-                <span className="text-[10px] text-[#A79798] font-mono">₹{verifiedPaymentsCount * 150} INR collected</span>
+              <div className="bg-[#130C0E] border border-[#E01B22]/60 p-4 rounded-[2px]">
+                <span className="mono-label text-[#E01B22] block text-[10px]">🏠 ACCOMMODATION</span>
+                <strong className="text-xl font-mono text-[#FF2A2A] mt-1 block">{accommodationCount}</strong>
+                <span className="text-[9px] text-[#A79798] font-mono">Hostel requests</span>
               </div>
-              <div className="bg-[#130C0E] border border-[#E08A17]/40 p-5 rounded-[2px]">
-                <span className="mono-label text-[#E08A17] block">ARENA ENROLLMENTS</span>
-                <strong className="text-2xl font-mono text-[#E08A17] mt-1 block">{totalEnrollments}</strong>
-                <span className="text-[10px] text-[#A79798] font-mono">Across 11 competition arenas</span>
+              <div className="bg-[#130C0E] border border-[#E08A17]/60 p-4 rounded-[2px]">
+                <span className="mono-label text-[#E08A17] block text-[10px]">ALUMNI RSVPs</span>
+                <strong className="text-xl font-mono text-[#E08A17] mt-1 block">{alumniCount}</strong>
+                <span className="text-[9px] text-[#A79798] font-mono">Reunion guests</span>
               </div>
-              <div className="bg-[#130C0E] border border-[#E01B22]/40 p-5 rounded-[2px]">
-                <span className="mono-label text-[#E01B22] block">OVERALL ATTENDANCE</span>
-                <strong className="text-2xl font-mono text-[#FF2A2A] mt-1 block">{overallAttendancePercentage}%</strong>
-                <span className="text-[10px] text-[#A79798] font-mono">{totalAttended} of {totalEnrollments} checked in</span>
+              <div className="bg-[#130C0E] border border-[#1FA971]/40 p-4 rounded-[2px]">
+                <span className="mono-label text-[#1FA971] block text-[10px]">PAYMENTS VERIFIED</span>
+                <strong className="text-xl font-mono text-[#1FA971] mt-1 block">{verifiedPaymentsCount}</strong>
+                <span className="text-[9px] text-[#A79798] font-mono">₹{verifiedPaymentsCount * 150} INR</span>
+              </div>
+              <div className="bg-[#130C0E] border border-[#2A1A1D] p-4 rounded-[2px]">
+                <span className="mono-label text-[#A79798] block text-[10px]">ARENA ENROLLMENTS</span>
+                <strong className="text-xl font-mono text-[#F7F2F2] mt-1 block">{totalEnrollments}</strong>
+                <span className="text-[9px] text-[#A79798] font-mono">Competition slots</span>
+              </div>
+              <div className="bg-[#130C0E] border border-[#E01B22]/40 p-4 rounded-[2px]">
+                <span className="mono-label text-[#E01B22] block text-[10px]">ATTENDANCE RATE</span>
+                <strong className="text-xl font-mono text-[#FF2A2A] mt-1 block">{overallAttendancePercentage}%</strong>
+                <span className="text-[9px] text-[#A79798] font-mono">{totalAttended}/{totalEnrollments} checked in</span>
               </div>
             </div>
 

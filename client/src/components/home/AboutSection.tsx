@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { DecryptedText } from '../../animations/DecryptedText';
-import { SplitText } from '../../animations/SplitText';
 
 export const AboutSection: React.FC = () => {
   return (
@@ -40,20 +38,10 @@ export const AboutSection: React.FC = () => {
             {/* Label and Title */}
             <div className="space-y-2 select-none">
               <span className="font-mono text-[11px] text-[#E01B22] font-black tracking-[0.25em] block">
-                <DecryptedText
-                  text="// DIRECTIVE // 01"
-                  animateOn="view"
-                  speed={50}
-                  maxIterations={12}
-                  useOriginalCharsOnly
-                />
+                // DIRECTIVE // 01
               </span>
               <h2 className="text-2xl sm:text-3xl font-display font-black text-[#F7F2F2] tracking-wider uppercase leading-tight">
-                <SplitText
-                  text="35 YEARS OF MASTERMINDS"
-                  textAlign="left"
-                  delay={60}
-                />
+                35 YEARS OF MASTERMINDS
               </h2>
             </div>
 

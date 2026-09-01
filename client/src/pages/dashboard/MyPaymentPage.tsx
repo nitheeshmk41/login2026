@@ -13,6 +13,8 @@ export const MyPaymentPage: React.FC = () => {
       const res = await api.payments.getMyStatus();
       return res.data;
     },
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
   });
 
   const { data: bonafideData, isLoading: bonafideLoading } = useQuery({

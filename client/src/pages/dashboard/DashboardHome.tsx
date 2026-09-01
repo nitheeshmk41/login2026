@@ -24,6 +24,8 @@ export const DashboardHome: React.FC = () => {
   const { data: paymentData } = useQuery({
     queryKey: ['payment-status'],
     queryFn: async () => { const res = await api.payments.getMyStatus(); return res.data; },
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
   });
 
   const { data: registrations = [] } = useQuery({
