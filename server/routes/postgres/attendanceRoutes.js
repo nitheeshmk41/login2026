@@ -9,7 +9,7 @@ const router = express.Router();
 router.get(
   "/event/:eventId",
   verifyJwt,
-  allowRoles("event_coordinator", "junior_attendance", "admin"),
+  allowRoles("coordinator", "admin", "registration_desk"),
   verifyEventCoordinatorAccess,
   attendanceController.getEventAttendance
 );
@@ -17,7 +17,7 @@ router.get(
 router.post(
   "/",
   verifyJwt,
-  allowRoles("event_coordinator", "junior_attendance", "admin"),
+  allowRoles("coordinator", "admin"),
   verifyEventCoordinatorAccess,
   attendanceController.markAttendance
 );

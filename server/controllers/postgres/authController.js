@@ -18,6 +18,23 @@ const alumniModel = require("../../models/postgres/alumniModel");
 
 const jwtSecret = process.env.JWT_SECRET || "super_secret_jwt_key_login_2026";
 
+const normalizeRole = (role) => {
+  const value = String(role || '').trim().toLowerCase();
+  const roleMap = {
+    student: 'participant',
+    participant: 'participant',
+    event_coordinator: 'coordinator',
+    coordinator: 'coordinator',
+    special_user: 'coordinator',
+    junior_attendance: 'coordinator',
+    admin: 'admin',
+    super_admin: 'admin',
+    admin_power: 'admin',
+  };
+
+  return roleMap[value] || value || 'participant';
+};
+
 const LOGIN_ID_PREFIX = "LOGIN";
 const LOGIN_ID_START = 101;
 
@@ -146,17 +163,45 @@ const registerUser = async (req, res) => {
     } = req.body;
 
     const isAlumni = String(user_type).toUpperCase() === "ALUMNI";
+    const trimmedName = String(name || "").trim();
+    const finalEmail = email ? String(email).trim().toLowerCase() : "";
+    const finalPhone = phone ? String(phone).trim() : "";
+    const trimmedPassword = typeof password === "string" ? password.trim() : "";
+    const trimmedOtp = typeof otp === "string" ? otp.trim() : "";
 
-    const loginId = isAlumni ? null : await generateLoginId(transaction);
-
-    const finalEmail = email ? email.toLowerCase().trim() : null;
-    const finalPhone = phone || null;
-
-    if (!name || (!isAlumni && !password)) {
+    if (!trimmedName) {
       await transaction.rollback();
-      return res.status(400).json({
-        message: isAlumni ? "Name is required" : "Name and password are required",
-      });
+      return res.status(400).json({ message: "Full name is required for registration." });
+    }
+
+    if (!finalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Please enter a valid email address." });
+    }
+
+    if (!isAlumni && (!trimmedPassword || trimmedPassword.length < 6)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Password must be at least 6 characters long." });
+    }
+
+    if (!isAlumni && (!college_name || String(college_name).trim().length < 2)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "College name is required." });
+    }
+
+    if (!isAlumni && (!department || String(department).trim().length < 2)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Department is required." });
+    }
+
+    if (!gender || String(gender).trim().length < 1) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Please select a gender." });
+    }
+
+    if (finalPhone && !/^\+?[0-9\s()-]{10,15}$/.test(finalPhone)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Please enter a valid mobile number." });
     }
 
     if (isAlumni && batch_year && !/^\d{2,4}(MX)?$/i.test(String(batch_year).trim())) {
@@ -166,17 +211,14 @@ const registerUser = async (req, res) => {
       });
     }
 
-    if (!email) {
+    if (!trimmedOtp || !/^\d{6}$/.test(trimmedOtp)) {
       await transaction.rollback();
-      return res.status(400).json({ message: "Email is required for registration." });
+      return res.status(400).json({ message: "OTP is required and must be a 6-digit code." });
     }
 
-    if (!otp) {
-      await transaction.rollback();
-      return res.status(400).json({ message: "OTP is required for registration." });
-    }
+    const loginId = isAlumni ? null : await generateLoginId(transaction);
 
-    const validOtp = await otpModel.findOne({ where: { email: finalEmail, otp }, transaction });
+    const validOtp = await otpModel.findOne({ where: { email: finalEmail, otp: trimmedOtp }, transaction });
     if (!validOtp) {
       await transaction.rollback();
       return res.status(400).json({ message: "Invalid or expired OTP." });
@@ -237,7 +279,7 @@ const registerUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const normalizedRole = "student";
+    const normalizedRole = "participant";
     const user = await userModel.create(
       {
         name,
@@ -363,7 +405,10 @@ const loginUser = async (req, res) => {
       });
     }
 
-    const normalizedRole = String(user.role || "student").toLowerCase();
+    const normalizedRole = normalizeRole(user.role);
+    if (normalizedRole === 'alumni' || String(user.user_type || '').toUpperCase() === 'ALUMNI') {
+      return res.status(403).json({ message: 'Alumni accounts are not available for dashboard login.' });
+    }
 
     const token = jwt.sign(
       {

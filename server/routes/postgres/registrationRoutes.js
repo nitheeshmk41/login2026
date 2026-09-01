@@ -9,21 +9,21 @@ const router = express.Router();
 router.post(
   "/",
   verifyJwt,
-  allowRoles("student"),
+  allowRoles("participant"),
   registrationController.createRegistration
 );
 
 router.get(
   "/my",
   verifyJwt,
-  allowRoles("student"),
+  allowRoles("participant"),
   registrationController.getMyRegistrations
 );
 
 router.get(
   "/event/:eventId",
   verifyJwt,
-  allowRoles("admin", "event_coordinator", "junior_attendance"),
+  allowRoles("admin", "coordinator", "registration_desk"),
   verifyEventCoordinatorAccess,
   registrationController.getEventRegistrations
 );
@@ -31,7 +31,7 @@ router.get(
 router.put(
   "/:id/cancel",
   verifyJwt,
-  allowRoles("student"),
+  allowRoles("participant"),
   registrationController.cancelRegistration
 );
 

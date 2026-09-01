@@ -1,13 +1,14 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { isAdminRole, isCoordinatorRole } from '../store/authStore';
+import { isAdminRole, isCoordinatorRole, isRegistrationDeskRole } from '../store/authStore';
 import { Loader2 } from 'lucide-react';
 
 /**
- * 3-role model:
- *  requireRole="admin"       → admin, super_admin, admin_power
- *  requireRole="coordinator" → event_coordinator, special_user, junior_attendance
- *  requireRole="student"     → student only (admins/coordinators are NOT students)
+ * 4-role model:
+ *  requireRole="admin"       → admin
+ *  requireRole="coordinator" → coordinator
+ *  requireRole="participant" → participant
+ *  requireRole="alumni"      → alumni (not used for portal login)
  *  (no requireRole)          → any authenticated user
  */
 export const ProtectedRoute = ({ children, requireRole }) => {
@@ -26,19 +27,22 @@ export const ProtectedRoute = ({ children, requireRole }) => {
   }
 
   if (requireRole) {
-    const userRole = survivor?.role || 'student';
+    const userRole = survivor?.role || 'participant';
     const isAdmin = isAdminRole(userRole);
+    const isDesk = isRegistrationDeskRole(userRole);
     const isCoord = isCoordinatorRole(userRole);
+    const isParticipant = userRole === 'participant';
 
     if (requireRole === 'admin') {
-      if (!isAdmin) return <Navigate to="/dashboard" replace />;
+      if (!isAdmin && !isDesk) return <Navigate to="/dashboard" replace />;
     } else if (requireRole === 'coordinator') {
-      // Admins can also access coordinator pages
-      if (!isAdmin && !isCoord) return <Navigate to="/dashboard" replace />;
-    } else if (requireRole === 'student') {
-      // Admins and coordinators should NOT see student dashboard — redirect to their own
-      if (isAdmin) return <Navigate to="/dashboard/admin" replace />;
+      if (!isAdmin && !isDesk && !isCoord) return <Navigate to="/dashboard" replace />;
+    } else if (requireRole === 'participant') {
+      if (isAdmin || isDesk) return <Navigate to="/dashboard/admin" replace />;
       if (isCoord) return <Navigate to="/dashboard/coordinator" replace />;
+      if (!isParticipant) return <Navigate to="/" replace />;
+    } else if (requireRole === 'alumni') {
+      return <Navigate to="/" replace />;
     }
   }
 

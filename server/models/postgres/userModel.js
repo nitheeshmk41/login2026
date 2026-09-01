@@ -51,16 +51,12 @@ const userModel = sequelize.define(
 
     role: {
       type: DataTypes.ENUM(
-        "student",
-        "event_coordinator",
-        "junior_attendance",
-        "special_user",
         "admin",
-        "super_admin",
-        "admin_power"
+        "coordinator",
+        "participant"
       ),
       allowNull: false,
-      defaultValue: "student",
+      defaultValue: "participant",
     },
 
     user_type: {

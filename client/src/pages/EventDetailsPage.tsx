@@ -13,7 +13,7 @@ export const EventDetailsPage: React.FC = () => {
   const [userRegistrations, setUserRegistrations] = useState<number[]>([]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'student') {
+    if (isAuthenticated && user?.role === 'participant') {
       api.registrations.getMyRegistrations().then((res) => {
         if (Array.isArray(res.data)) {
           setUserRegistrations(res.data.map((r: any) => r.event_id));
@@ -198,9 +198,9 @@ export const EventDetailsPage: React.FC = () => {
 
               {/* Status & Redirect Action Button */}
               <div className="pt-4 border-t border-[#2A1A1D]">
-                {user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'admin_power' || user?.role === 'event_coordinator' ? (
+                {user?.role === 'admin' || user?.role === 'coordinator' ? (
                   <button
-                    onClick={() => navigate(user?.role?.includes('coord') ? '/coordinator' : '/admin')}
+                    onClick={() => navigate(user?.role === 'coordinator' ? '/coordinator' : '/admin')}
                     className="w-full py-3.5 bg-[#E08A17] hover:bg-[#FFA500] text-[#0A0607] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors"
                   >
                     GO TO EVENT CONTROL DASHBOARD →

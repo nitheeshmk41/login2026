@@ -111,7 +111,7 @@ const assignCoordinator = async (req, res) => {
     const { user_id } = req.body;
 
     const coordinator = await userModel.findOne({
-      where: { id: user_id, role: "event_coordinator" },
+      where: { id: user_id, role: "coordinator" },
     });
 
     if (!coordinator) {

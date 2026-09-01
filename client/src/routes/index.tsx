@@ -68,23 +68,23 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          // Participant routes (student role only)
+          // Participant routes
           {
             index: true,
             element: (
-              <ProtectedRoute requireRole="student">
+              <ProtectedRoute requireRole="participant">
                 <DashboardHome />
               </ProtectedRoute>
             ),
           },
-          { path: 'profile', element: <ProtectedRoute requireRole="student"><DashboardProfilePage /></ProtectedRoute> },
-          { path: 'events', element: <ProtectedRoute requireRole="student"><DashboardEventsPage /></ProtectedRoute> },
-          { path: 'payment', element: <ProtectedRoute requireRole="student"><MyPaymentPage /></ProtectedRoute> },
-          { path: 'registrations', element: <ProtectedRoute requireRole="student"><MyRegistrationsPage /></ProtectedRoute> },
-          { path: 'certificates', element: <ProtectedRoute requireRole="student"><CertificatesPage /></ProtectedRoute> },
+          { path: 'profile', element: <ProtectedRoute requireRole="participant"><DashboardProfilePage /></ProtectedRoute> },
+          { path: 'events', element: <ProtectedRoute requireRole="participant"><DashboardEventsPage /></ProtectedRoute> },
+          { path: 'payment', element: <ProtectedRoute requireRole="participant"><MyPaymentPage /></ProtectedRoute> },
+          { path: 'registrations', element: <ProtectedRoute requireRole="participant"><MyRegistrationsPage /></ProtectedRoute> },
+          { path: 'certificates', element: <ProtectedRoute requireRole="participant"><CertificatesPage /></ProtectedRoute> },
           { path: 'winners', element: <ProtectedRoute requireRole=""><WinnersPage /></ProtectedRoute> },
-          { path: 'teams', element: <ProtectedRoute requireRole="student"><MyTeamsPage /></ProtectedRoute> },
-          { path: 'notifications', element: <ProtectedRoute requireRole="student"><NotificationsPage /></ProtectedRoute> },
+          { path: 'teams', element: <ProtectedRoute requireRole="participant"><MyTeamsPage /></ProtectedRoute> },
+          { path: 'notifications', element: <ProtectedRoute requireRole="participant"><NotificationsPage /></ProtectedRoute> },
 
           // Admin routes — section driven by URL path
           {

@@ -8,14 +8,14 @@ const router = express.Router();
 router.get(
   "/my",
   verifyJwt,
-  allowRoles("student"),
+  allowRoles("participant"),
   bonafideController.getMyBonafide
 );
 
 router.post(
   "/",
   verifyJwt,
-  allowRoles("student"),
+  allowRoles("participant"),
   bonafideController.uploadBonafide
 );
 

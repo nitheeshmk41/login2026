@@ -37,7 +37,7 @@ export const ChangePasswordPage: React.FC = () => {
       }
 
       if (user?.role === 'admin') navigate('/admin');
-      else if (user?.role === 'event_coordinator') navigate('/coordinator');
+      else if (user?.role === 'coordinator') navigate('/coordinator');
       else navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to change password.');

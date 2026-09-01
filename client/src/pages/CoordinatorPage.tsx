@@ -274,6 +274,7 @@ export const CoordinatorPage: React.FC = () => {
                           <th className="pb-2 font-normal">College</th>
                           <th className="pb-2 font-normal">Team</th>
                           <th className="pb-2 font-normal">Accommodation</th>
+                          <th className="pb-2 font-normal">Payment</th>
                           <th className="pb-2 font-normal">Status</th>
                         </tr>
                       </thead>
@@ -288,6 +289,9 @@ export const CoordinatorPage: React.FC = () => {
                               {r.student?.accommodation_required || r.user?.accommodation_required ? (
                                 <span className="text-[#E01B22]">YES</span>
                               ) : 'NO'}
+                            </td>
+                            <td className="py-2 font-mono text-[#A79798]">
+                              {(r.payment_status || 'NOT_SUBMITTED').toUpperCase()}
                             </td>
                             <td className="py-2">{r.attendance_status || (r.attended ? 'PRESENT' : 'ABSENT')}</td>
                           </tr>

@@ -53,7 +53,7 @@ export const TimelinePage: React.FC = () => {
   // Removed fetchTimeline useEffect since eventsData is statically loaded
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'student') {
+    if (isAuthenticated && user?.role === 'participant') {
       api.registrations.getMyRegistrations().then((res) => {
         if (Array.isArray(res.data)) {
           setUserRegistrations(res.data.map((r: any) => r.event_id));

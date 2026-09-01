@@ -26,8 +26,8 @@ const csvUpload = multer({
 });
 
 // ── Participant ──────────────────────────────────────
-router.get('/my', verifyJwt, allowRoles('student'), paymentController.getMyPayment);
-router.post('/', verifyJwt, allowRoles('student'), paymentController.createPayment);
+router.get('/my', verifyJwt, allowRoles('participant'), paymentController.getMyPayment);
+router.post('/', verifyJwt, allowRoles('participant'), paymentController.createPayment);
 
 // ── Admin + Coordinator (read all payments) ──────────
 router.get(

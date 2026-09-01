@@ -35,13 +35,19 @@ export const LoginPage: React.FC = () => {
       const res = await api.auth.login(payload);
       const { token, user } = res.data;
 
-      setAuth(true, token, user);
+      const normalizedRole = String(user.role || 'participant').toLowerCase();
+      if (String(user.user_type || '').toUpperCase() === 'ALUMNI') {
+        setError('Alumni accounts do not have portal login access.');
+        return;
+      }
+
+      setAuth(true, token, { ...user, role: normalizedRole });
 
       if (user.must_change_password) {
         navigate('/change-password');
-      } else if (['super_admin', 'admin_power', 'admin'].includes(user.role)) {
+      } else if (['admin', 'registration_desk'].includes(normalizedRole)) {
         navigate('/dashboard/admin');
-      } else if (['event_coordinator', 'special_user', 'junior_attendance'].includes(user.role)) {
+      } else if (['coordinator'].includes(normalizedRole)) {
         navigate('/dashboard/coordinator');
       } else {
         navigate('/dashboard');

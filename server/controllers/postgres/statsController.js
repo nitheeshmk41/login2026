@@ -7,7 +7,7 @@ const alumniModel = require("../../models/postgres/alumniModel");
 
 const getParticipantStats = async (req, res) => {
   try {
-    const totalUsers = await userModel.count({ where: { role: "student" } });
+    const totalUsers = await userModel.count({ where: { role: "participant" } });
 
     const totalVerifiedPayments = await paymentModel.count({
       where: { status: ["VERIFIED", "successful"] },

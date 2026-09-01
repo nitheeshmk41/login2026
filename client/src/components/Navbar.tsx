@@ -179,15 +179,11 @@ export const Navbar: React.FC<NavbarProps> = () => {
                       <p className="text-[10px] text-[#A79798] truncate">{user?.email}</p>
                     </div>
                     
-                    {user?.role === 'admin' || user?.role === 'super_admin' ? (
+                    {user?.role === 'admin' ? (
                       <Link to="/admin" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 font-bold text-[#E01B22] hover:bg-[#0A0607]">
                         <Shield className="w-4 h-4" /> COMMAND CENTER
                       </Link>
-                    ) : user?.role === 'admin_power' ? (
-                      <Link to="/admin/access-control" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 font-bold text-[#E01B22] hover:bg-[#0A0607]">
-                        <Shield className="w-4 h-4" /> SUPER ADMIN
-                      </Link>
-                    ) : user?.role === 'event_coordinator' ? (
+                    ) : user?.role === 'coordinator' ? (
                       <Link to="/coordinator" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 font-bold text-[#E08A17] hover:bg-[#0A0607]">
                         <Trophy className="w-4 h-4" /> COORDINATOR HUB
                       </Link>

@@ -1,6 +1,12 @@
 const attendanceModel = require("../../models/postgres/attendanceModel");
 const eventModel = require("../../models/postgres/eventModel");
 
+const normalizeAttendanceStatus = (status) => {
+  if (typeof status !== "string") return null;
+  const normalized = status.trim().toLowerCase();
+  return ["present", "absent", "not_marked"].includes(normalized) ? normalized : null;
+};
+
 const getEventAttendance = async (req, res) => {
   try {
     const attendance = await attendanceModel.findAll({
@@ -17,8 +23,9 @@ const getEventAttendance = async (req, res) => {
 const markAttendance = async (req, res) => {
   try {
     const { event_id, student_id, status } = req.body;
+    const normalizedStatus = normalizeAttendanceStatus(status);
 
-    if (!["present", "absent", "not_marked"].includes(status)) {
+    if (!normalizedStatus) {
       return res.status(400).json({ message: "Invalid attendance status" });
     }
 
@@ -27,15 +34,15 @@ const markAttendance = async (req, res) => {
       defaults: {
         event_id,
         student_id,
-        status,
+        status: normalizedStatus,
         marked_by: req.user.id,
         marked_at: new Date(),
       },
     });
 
-    if (attendance.status !== status || attendance.marked_by !== req.user.id) {
+    if (attendance.status !== normalizedStatus || attendance.marked_by !== req.user.id) {
       await attendance.update({
-        status,
+        status: normalizedStatus,
         marked_by: req.user.id,
         marked_at: new Date(),
       });

@@ -193,7 +193,7 @@ export const EventsPage: React.FC = () => {
   const categoryParam = searchParams.get('category')?.toUpperCase() || 'ALL';
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'student') {
+    if (isAuthenticated && user?.role === 'participant') {
       api.registrations.getMyRegistrations().then((res) => {
         if (Array.isArray(res.data)) {
           setUserRegistrations(res.data.map((r: any) => r.event_id));
@@ -340,9 +340,9 @@ export const EventsPage: React.FC = () => {
                         View Details
                       </button>
 
-                      {user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'admin_power' || user?.role === 'event_coordinator' ? (
+                      {user?.role === 'admin' || user?.role === 'coordinator' ? (
                         <button
-                          onClick={() => navigate(user?.role?.includes('coord') ? '/coordinator' : '/admin')}
+                          onClick={() => navigate(user?.role === 'coordinator' ? '/coordinator' : '/admin')}
                           className="px-3.5 py-2 bg-[#1A1114] border border-[#3E2529] hover:border-[#E08A17] text-[#E08A17] hover:text-[#F7F2F2] font-mono text-xs font-bold uppercase rounded-[2px] transition-colors"
                         >
                           Manage Event

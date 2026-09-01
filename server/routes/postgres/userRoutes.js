@@ -18,7 +18,7 @@ router.get(
 router.put(
   "/profile",
   verifyJwt,
-  allowRoles("student"),
+  allowRoles("participant"),
   userController.updateMyProfile
 );
 
@@ -26,19 +26,19 @@ router.put(
 router.get(
   "/",
   verifyJwt,
-  allowRoles("admin", "coordinator"),
+  allowRoles("admin", "coordinator", "registration_desk"),
   userController.getAllUsers
 );
 
 router.post(
   "/",
   verifyJwt,
-  allowRoles("admin", "coordinator"),
+  allowRoles("admin", "coordinator", "registration_desk"),
   userController.createUserByAdmin
 );
 
-router.put("/alumni/:id", verifyJwt, allowRoles("admin", "super_admin", "admin_power"), userController.updateAlumni);
-router.delete("/alumni/:id", verifyJwt, allowRoles("admin", "super_admin", "admin_power"), userController.deleteAlumni);
+router.put("/alumni/:id", verifyJwt, allowRoles("admin"), userController.updateAlumni);
+router.delete("/alumni/:id", verifyJwt, allowRoles("admin"), userController.deleteAlumni);
 
 
 router.put(
@@ -59,7 +59,7 @@ router.delete(
 router.get(
   "/:id",
   verifyJwt,
-  allowRoles("admin", "super_admin", "admin_power"),
+  allowRoles("admin"),
   userController.getUserById
 );
 
@@ -67,7 +67,7 @@ router.get(
 router.put(
   "/:id/role",
   verifyJwt,
-  allowRoles("super_admin", "admin_power"),
+  allowRoles("admin"),
   userController.updateUserRole
 );
 
@@ -75,7 +75,7 @@ router.put(
 router.put(
   "/:id/status",
   verifyJwt,
-  allowRoles("admin", "super_admin", "admin_power"),
+  allowRoles("admin"),
   userController.updateUserStatus
 );
 

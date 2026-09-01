@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { ENV } from '../services/env';
+import staticEventsData from '../data/events.json';
 import { Plus, Trash2, Download, Search, ShieldAlert, Radio, Trophy, Pencil, Upload, CheckCircle2, XCircle, FileText } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
+
+const STATIC_EVENTS = Array.isArray(staticEventsData) ? staticEventsData : [];
 
 export const AdminPage: React.FC = () => {
   const { section } = useParams<{ section?: string }>();
-  const { user: currentUser } = useAuthStore();
-  const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'admin_power';
 
   type AdminTab = 'PAYMENTS' | 'REGISTRATIONS' | 'ALUMNI' | 'USERS' | 'DASHBOARD' | 'ANNOUNCEMENTS' | 'EVENTS' | 'CSV_UPLOAD' | 'SETTINGS';
 
@@ -32,7 +32,7 @@ export const AdminPage: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>(STATIC_EVENTS);
   const [allRegistrations, setAllRegistrations] = useState<any[]>([]);
   const [showWinnersSetting, setShowWinnersSetting] = useState<boolean>(false);
   const [updatingSetting, setUpdatingSetting] = useState<boolean>(false);
@@ -64,7 +64,7 @@ export const AdminPage: React.FC = () => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState('event_coordinator');
+  const [newUserRole, setNewUserRole] = useState('coordinator');
   const [newUserEventId, setNewUserEventId] = useState('');
   const [newUserCollege, setNewUserCollege] = useState('PSG College of Technology');
   const [newUserDepartment, setNewUserDepartment] = useState('Computer Applications');
@@ -73,13 +73,15 @@ export const AdminPage: React.FC = () => {
   // Edit User Modal State
   const [editModalUser, setEditModalUser] = useState<any>(null);
 
+  const eventOptions = useMemo(() => (events.length ? events : STATIC_EVENTS), [events]);
+
   const fetchData = async () => {
     try {
       const [payRes, userRes, annoRes, eventRes, settingsRes] = await Promise.all([
         api.payments.getAll(),
         api.users.getAll(),
         api.announcements.getActive(),
-        api.events.getAll(),
+        api.events.getAll().catch(() => ({ data: STATIC_EVENTS })),
         api.settings.get().catch(() => ({ data: { show_winners: 'false' } })),
       ]);
 
@@ -87,23 +89,23 @@ export const AdminPage: React.FC = () => {
       if (Array.isArray(userRes.data)) setUsers(userRes.data);
       if (Array.isArray(annoRes.data)) setAnnouncements(annoRes.data);
       if (settingsRes?.data) setShowWinnersSetting(settingsRes.data.show_winners === 'true');
-      
-      if (Array.isArray(eventRes.data)) {
-        setEvents(eventRes.data);
-        
-        // Fetch all registrations across all events for event-wise analysis
-        const regPromises = eventRes.data.map((evt: any) =>
-          api.registrations.getEventRegistrations(evt.id).then((r) => ({
-            eventId: evt.id,
-            eventName: evt.name,
-            registrations: Array.isArray(r.data) ? r.data : [],
-          })).catch(() => ({ eventId: evt.id, eventName: evt.name, registrations: [] }))
-        );
-        const regResults = await Promise.all(regPromises);
-        setAllRegistrations(regResults);
-      }
+
+      const resolvedEvents = Array.isArray(eventRes.data) && eventRes.data.length > 0 ? eventRes.data : STATIC_EVENTS;
+      setEvents(resolvedEvents);
+
+      // Fetch all registrations across all events for event-wise analysis
+      const regPromises = resolvedEvents.map((evt: any) =>
+        api.registrations.getEventRegistrations(evt.id).then((r) => ({
+          eventId: evt.id,
+          eventName: evt.name,
+          registrations: Array.isArray(r.data) ? r.data : [],
+        })).catch(() => ({ eventId: evt.id, eventName: evt.name, registrations: [] }))
+      );
+      const regResults = await Promise.all(regPromises);
+      setAllRegistrations(regResults);
     } catch (err) {
       console.error('Failed to load admin data:', err);
+      setEvents(STATIC_EVENTS);
     }
   };
 
@@ -175,6 +177,12 @@ export const AdminPage: React.FC = () => {
 
     try {
       setCreatingUser(true);
+      const requiresEventAssignment = ['coordinator', 'registration_desk'].includes(newUserRole);
+      if (requiresEventAssignment && !newUserEventId) {
+        alert('Please select an assigned event for this role.');
+        return;
+      }
+
       await api.users.create({
         name: newUserName.trim(),
         login_id: newUserLoginId.trim() || undefined,
@@ -182,7 +190,7 @@ export const AdminPage: React.FC = () => {
         phone: newUserPhone.trim() || '9876543210',
         password: newUserPassword,
         role: newUserRole,
-        event_id: newUserRole === 'event_coordinator' ? Number(newUserEventId) : undefined,
+        event_id: requiresEventAssignment ? Number(newUserEventId) : undefined,
         college_name: newUserCollege.trim(),
         department: newUserDepartment.trim(),
       });
@@ -445,7 +453,7 @@ export const AdminPage: React.FC = () => {
   };
 
   // Telemetry Calculations
-  const totalStudents = users.filter((u) => u.role === 'student').length;
+  const totalStudents = users.filter((u) => u.role === 'participant').length;
   const verifiedPaymentsCount = payments.filter((p) => p.status === 'VERIFIED').length;
   
   let totalEnrollments = 0;
@@ -685,6 +693,7 @@ export const AdminPage: React.FC = () => {
                               <th className="py-2 px-3">COLLEGE</th>
                               <th className="py-2 px-3">TEAM / SQUAD</th>
                               <th className="py-2 px-3">ACCOMMODATION</th>
+                              <th className="py-2 px-3">PAYMENT</th>
                               <th className="py-2 px-3">ATTENDANCE</th>
                               <th className="py-2 px-3">ACTIONS</th>
                             </tr>
@@ -709,6 +718,17 @@ export const AdminPage: React.FC = () => {
                                   {reg.student?.accommodation_required || reg.user?.accommodation_required ? (
                                     <span className="text-[#E01B22]">YES</span>
                                   ) : 'NO'}
+                                </td>
+                                <td className="py-2 px-3 font-mono text-[#A79798]">
+                                  <span className={`px-2 py-0.5 rounded-[2px] border ${
+                                    (reg.payment_status || 'NOT_SUBMITTED') === 'VERIFIED'
+                                      ? 'bg-[#1FA971]/15 text-[#1FA971] border-[#1FA971]'
+                                      : (reg.payment_status || 'NOT_SUBMITTED') === 'PENDING'
+                                        ? 'bg-[#E08A17]/15 text-[#E08A17] border-[#E08A17]'
+                                        : 'bg-[#1A1114] text-[#A79798] border-[#2A1A1D]'
+                                  }`}>
+                                    {reg.payment_status || 'NOT_SUBMITTED'}
+                                  </span>
                                 </td>
                                 <td className="py-2 px-3">
                                   <span className={`px-2 py-0.5 rounded-[2px] font-mono text-[10px] font-bold ${
@@ -870,20 +890,13 @@ export const AdminPage: React.FC = () => {
                       onChange={(e) => setNewUserRole(e.target.value)}
                       className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-2.5 rounded-[2px] outline-none font-mono"
                     >
-                      <option value="event_coordinator">event_coordinator</option>
+                      <option value="coordinator">coordinator</option>
+                      <option value="registration_desk">registration_desk</option>
                       <option value="admin">admin</option>
-                      <option value="student">student</option>
-                      {isSuperAdmin && (
-                        <>
-                          <option value="junior_attendance">junior_attendance</option>
-                          <option value="special_user">special_user</option>
-                          <option value="super_admin">Admin</option>
-                          <option value="admin_power">Admin</option>
-                        </>
-                      )}
+                      <option value="participant">participant</option>
                     </select>
                   </div>
-                  {newUserRole === 'event_coordinator' && (
+                  {['coordinator', 'registration_desk'].includes(newUserRole) && (
                     <div>
                       <label className="block text-[#A79798] mb-1 font-semibold">Assigned Event *</label>
                       <select
@@ -893,7 +906,7 @@ export const AdminPage: React.FC = () => {
                         className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-2.5 rounded-[2px] outline-none font-mono"
                       >
                         <option value="">Select one event</option>
-                        {events.map((event) => (
+                        {eventOptions.map((event) => (
                           <option key={event.id} value={event.id}>{event.name}</option>
                         ))}
                       </select>
@@ -956,7 +969,7 @@ export const AdminPage: React.FC = () => {
                         </td>
                         <td className="p-3.5 font-mono text-[#A79798]">{u.department || 'Computer Applications'}</td>
                         <td className="p-3.5 font-mono text-[#E08A17]">
-                          {u.role === 'event_coordinator'
+                          {['coordinator', 'registration_desk'].includes(u.role)
                             ? (u.eventAssignments?.[0]?.event?.name || 'Unassigned')
                             : '-'}
                         </td>
@@ -968,17 +981,10 @@ export const AdminPage: React.FC = () => {
                               onChange={(e) => handleRoleChange(u.id, e.target.value)}
                               className="bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] px-2.5 py-1 rounded-[2px] text-xs font-mono outline-none"
                             >
-                            <option value="event_coordinator">event_coordinator</option>
+                            <option value="coordinator">coordinator</option>
+                            <option value="registration_desk">registration_desk</option>
                             <option value="admin">admin</option>
-                            <option value="student">student</option>
-                            {isSuperAdmin && (
-                              <>
-                                <option value="junior_attendance">junior_attendance</option>
-                                <option value="special_user">special_user</option>
-                                <option value="super_admin">Admin</option>
-                                <option value="admin_power">Admin</option>
-                              </>
-                            )}
+                            <option value="participant">participant</option>
                           </select>
                           <button
                             onClick={() => setEditModalUser(u)}
@@ -1467,17 +1473,9 @@ export const AdminPage: React.FC = () => {
                     onChange={(e) => setEditModalUser({ ...editModalUser, role: e.target.value })}
                     className="w-full bg-[#130C0E] border border-[#2A1A1D] p-2 text-[#F7F2F2] outline-none focus:border-[#E01B22]"
                   >
-                    <option value="student">student</option>
-                    <option value="event_coordinator">event_coordinator</option>
+                    <option value="participant">participant</option>
+                    <option value="coordinator">coordinator</option>
                     <option value="admin">admin</option>
-                    {isSuperAdmin && (
-                      <>
-                        <option value="junior_attendance">junior_attendance</option>
-                        <option value="special_user">special_user</option>
-                        <option value="super_admin">Admin</option>
-                        <option value="admin_power">Admin</option>
-                      </>
-                    )}
                   </select>
                 </div>
                 <div>

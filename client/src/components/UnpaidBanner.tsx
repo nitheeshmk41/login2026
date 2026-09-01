@@ -11,7 +11,7 @@ export const UnpaidBanner: React.FC = () => {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'student') {
+    if (!isAuthenticated || user?.role !== 'participant') {
       setVisible(false);
       return;
     }

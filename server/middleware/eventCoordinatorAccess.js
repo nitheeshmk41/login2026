@@ -3,9 +3,13 @@ const eventCoordinatorModel = require("../models/postgres/eventCoordinatorModel"
 const getRequestedEventId = (req) => req.params.eventId || req.body.event_id;
 
 const verifyEventCoordinatorAccess = async (req, res, next) => {
-  const role = String(req.user?.role || "").toLowerCase();
+  const role = String(req.user?.role || "").trim().toLowerCase();
 
-  if (role !== "event_coordinator") {
+  if (role === "admin" || role === "registration_desk") {
+    return next();
+  }
+
+  if (role !== "coordinator") {
     return next();
   }
 

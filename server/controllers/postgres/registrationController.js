@@ -2,6 +2,8 @@ const { Op } = require("sequelize");
 const registrationModel = require("../../models/postgres/registrationModel");
 const eventModel = require("../../models/postgres/eventModel");
 const userModel = require("../../models/postgres/userModel");
+const paymentModel = require("../../models/postgres/paymentModel");
+const attendanceModel = require("../../models/postgres/attendanceModel");
 const teamModel = require("../../models/postgres/teamModel");
 const teamMemberModel = require("../../models/postgres/teamMemberModel");
 const { sendEventRegistrationConfirmation } = require("../../services/emailService");
@@ -356,7 +358,52 @@ const getEventRegistrations = async (req, res) => {
       ],
     });
 
-    return res.json(registrations);
+    const studentIds = [...new Set(registrations.map((reg) => reg.student_id).filter(Boolean))];
+
+    const [payments, attendances] = await Promise.all([
+      studentIds.length
+        ? paymentModel.findAll({
+            where: { student_id: { [Op.in]: studentIds } },
+            order: [["createdAt", "DESC"]],
+          })
+        : [],
+      studentIds.length
+        ? attendanceModel.findAll({
+            where: {
+              event_id: req.params.eventId,
+              student_id: { [Op.in]: studentIds },
+            },
+          })
+        : [],
+    ]);
+
+    const paymentByStudent = new Map();
+    for (const payment of payments) {
+      if (!paymentByStudent.has(payment.student_id)) {
+        paymentByStudent.set(payment.student_id, payment);
+      }
+    }
+
+    const attendanceByStudent = new Map();
+    for (const attendance of attendances) {
+      attendanceByStudent.set(attendance.student_id, attendance.status || "not_marked");
+    }
+
+    const payload = registrations.map((registration) => {
+      const row = registration.toJSON();
+      const payment = paymentByStudent.get(registration.student_id) || null;
+      const attendanceStatus = attendanceByStudent.get(registration.student_id) || "not_marked";
+
+      row.student = row.student || null;
+      row.payment_status = payment ? payment.status : "NOT_SUBMITTED";
+      row.payment_amount = payment ? payment.amount : null;
+      row.payment_reference = payment ? payment.transaction_reference : null;
+      row.attendance_status = String(attendanceStatus || "not_marked").toUpperCase();
+
+      return row;
+    });
+
+    return res.json(payload);
   } catch (error) {
     return res.status(500).json({
       message: "Failed to fetch event registrations",

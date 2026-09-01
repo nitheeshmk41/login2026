@@ -40,7 +40,7 @@ services:
       JWT_SECRET: super_secret_jwt_key_login_2026
       SESSION_SECRET: super_secret_session_key_login_2026
     env_file:
-      - ./.ENV
+      - ./.env
     networks:
       - default
       - npm_default

@@ -5,6 +5,7 @@ const fs = require("fs");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
 const expressLayouts = require("express-ejs-layouts");
+const { sendEmail } = require("./services/emailService");
 
 const app = express();
 const publicUploadsDir = path.join(__dirname, "public", "uploads");
@@ -91,6 +92,54 @@ app.use("/uploads", express.static(publicUploadsDir));
 
 // MPA View Routes (Server-rendered HTML)
 app.use("/", require("./routes/views/index"));
+
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, email, message } = req.body || {};
+    const trimmedName = String(name || "").trim();
+    const trimmedEmail = String(email || "").trim();
+    const trimmedMessage = String(message || "").trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedMessage) {
+      return res.status(400).json({ message: "Name, email, and message are required." });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return res.status(400).json({ message: "Please enter a valid email address." });
+    }
+
+    if (trimmedMessage.length < 12) {
+      return res.status(400).json({ message: "Your message must be at least 12 characters long." });
+    }
+
+    const html = `
+      <div style="font-family:Segoe UI,Arial,sans-serif; background:#0A0607; color:#F7F2F2; padding:28px; border:1px solid #2A1A1D; max-width:640px; margin:0 auto;">
+        <div style="background:linear-gradient(135deg,#E01B22 0%,#26080C 100%); padding:20px 24px; margin-bottom:20px; border-radius:8px;">
+          <div style="font-size:12px; letter-spacing:3px; text-transform:uppercase; font-weight:700;">LOGIN 2K26</div>
+          <div style="font-size:11px; letter-spacing:2px; opacity:0.8; margin-top:8px;">CONTACT FORM MESSAGE</div>
+        </div>
+        <div style="line-height:1.8; font-size:15px; color:#F7F2F2;">
+          <p><strong>Name:</strong> ${trimmedName}</p>
+          <p><strong>Email:</strong> ${trimmedEmail}</p>
+          <p><strong>Message:</strong></p>
+          <p style="white-space:pre-wrap; color:#A79798;">${trimmedMessage.replace(/\n/g, '<br/>')}</p>
+        </div>
+      </div>
+    `;
+
+    await sendEmail({
+      to: "login@psgtech.ac.in",
+      subject: `[LOGIN 2K26] Contact form message from ${trimmedName}`,
+      html,
+      text: `Name: ${trimmedName}\nEmail: ${trimmedEmail}\nMessage: ${trimmedMessage}`,
+    });
+
+    return res.status(200).json({ message: "Your message has been sent successfully." });
+  } catch (error) {
+    console.error("Contact form email error:", error);
+    return res.status(500).json({ message: "Unable to send message right now. Please contact login@psgtech.ac.in directly." });
+  }
+});
 
 // API Routes
 app.use("/api/events", require("./routes/postgres/eventRoutes"));

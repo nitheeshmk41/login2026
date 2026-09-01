@@ -173,9 +173,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onExploreEvents }) => 
           {isAuthenticated ? (
             <Link
               to={
-                user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'admin_power'
+                user?.role === 'admin'
                   ? '/admin'
-                  : user?.role === 'event_coordinator'
+                  : user?.role === 'coordinator'
                   ? '/coordinator'
                   : user?.user_type === 'ALUMNI'
                   ? '/alumni'
@@ -183,9 +183,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onExploreEvents }) => 
               }
               className="shimmer-btn w-full sm:w-auto px-8 py-3.5 bg-[#E01B22] hover:bg-[#FF2A2A] text-[#F7F2F2] font-mono text-xs font-bold uppercase tracking-wider rounded-[2px] shadow-lg hover:shadow-[0_0_20px_rgba(224,27,34,0.4)] flex items-center justify-center gap-2"
             >
-              {user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'admin_power'
+              {user?.role === 'admin'
                 ? 'COMMAND CENTER'
-                : user?.role === 'event_coordinator'
+                : user?.role === 'coordinator'
                 ? 'COORDINATOR PORTAL'
                 : 'MY DASHBOARD'}
               <ArrowRight className="w-4 h-4" />

@@ -22,14 +22,43 @@ const startServer = async () => {
   try {
     await connectPostgres();
 
-    // Sync database models first to ensure all default tables and enum types exist
-    await sequelize.sync({ logging: false });
+    const ensureSchema = async (dbInstance, label) => {
+      if (!dbInstance) return;
+      await dbInstance.sync({ force: false, alter: false, logging: false });
+      console.log(`Schema check complete for ${label}`);
+    };
+
+    await ensureSchema(sequelize, 'local database');
+
+    if (neonSequelize) {
+      try {
+        await ensureSchema(neonSequelize, 'Neon database');
+      } catch (neonSyncErr) {
+        console.warn('Neon schema sync skipped due to connection issue:', neonSyncErr.message);
+      }
+    }
 
     // Apply incremental schema updates safely
     try {
       await sequelize.query("ALTER TYPE \"enum_users_user_type\" ADD VALUE IF NOT EXISTS 'STAFF';");
     } catch (enumErr) {
       console.warn("enum_users_user_type update warning:", enumErr.message);
+    }
+
+    try {
+      await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'admin';");
+      await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'coordinator';");
+      await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'participant';");
+    } catch (enumErr) {
+      console.warn("enum_users_role update warning:", enumErr.message);
+    }
+
+    try {
+      await sequelize.query("UPDATE users SET role = 'participant' WHERE role = 'student' OR role = 'alumni';");
+      await sequelize.query("UPDATE users SET role = 'coordinator' WHERE role IN ('event_coordinator', 'special_user', 'junior_attendance');");
+      await sequelize.query("UPDATE users SET role = 'admin' WHERE role IN ('admin', 'super_admin', 'admin_power');");
+    } catch (roleUpdateErr) {
+      console.warn('Legacy role normalization warning:', roleUpdateErr.message);
     }
 
     const queryInterface = sequelize.getQueryInterface();
@@ -109,9 +138,12 @@ const startServer = async () => {
     
     // Start Dual DB Synchronization (Local -> Neon) every 5 minutes (300000 ms)
     if (neonSequelize) {
-       // Optional: do an initial sync on startup
-       syncLocalToNeon().catch(console.error);
-       startSyncCron(300000);
+      try {
+        syncLocalToNeon().catch(console.error);
+        startSyncCron(300000);
+      } catch (syncErr) {
+        console.warn('Neon sync startup skipped due to connection issue:', syncErr.message);
+      }
     }
 
     app.listen(PORT, () => {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, ShieldAlert } from 'lucide-react';
+import { api } from '../services/api';
 
 export const ContactPage: React.FC = () => {
   const [name, setName] = useState('');
@@ -9,22 +10,47 @@ export const ContactPage: React.FC = () => {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !message) {
-      setError('ALL ENCRYPTION CHANNELS MUST BE POPULATED.');
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedMessage = message.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedMessage) {
+      setError('Please complete all fields before sending your message.');
       return;
     }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (trimmedMessage.length < 12) {
+      setError('Your message must be at least 12 characters long.');
+      return;
+    }
+
     setError(null);
     setSending(true);
-    // Simulate sending transmission
-    setTimeout(() => {
-      setSending(false);
+
+    try {
+      await api.post('/contact', {
+        name: trimmedName,
+        email: trimmedEmail,
+        message: trimmedMessage,
+      });
+
       setSent(true);
       setName('');
       setEmail('');
       setMessage('');
-    }, 1800);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Transmission failed. Please try again or contact login@psgtech.ac.in directly.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (

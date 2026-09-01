@@ -6,7 +6,7 @@ const eventController = require("../../controllers/postgres/eventController");
 const router = express.Router();
 
 router.get("/", eventController.getAllEvents);
-router.get("/assigned", verifyJwt, allowRoles("event_coordinator"), eventController.getAssignedEvents);
+router.get("/assigned", verifyJwt, allowRoles("coordinator", "registration_desk"), eventController.getAssignedEvents);
 router.get("/timeline", verifyJwt, eventController.getTimeline);
 router.get("/:id", eventController.getEvent);
 

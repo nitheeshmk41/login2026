@@ -10,11 +10,13 @@ export interface UserProfile {
   college_name: string | null;
   department: string | null;
   roll_no: string | null;
-  // 3 logical roles → DB enum values:
-  // admin   → 'admin' | 'super_admin' | 'admin_power'
-  // coord   → 'event_coordinator' | 'special_user' | 'junior_attendance'
-  // student → 'student'
-  role: 'student' | 'event_coordinator' | 'junior_attendance' | 'special_user' | 'admin' | 'super_admin' | 'admin_power';
+  // Canonical portal roles:
+  // admin → admin
+  // coordinator → coordinator
+  // registration_desk → registration_desk
+  // participant → participant
+  // alumni is signup-only metadata and is not a portal login role
+  role: 'admin' | 'coordinator' | 'registration_desk' | 'participant';
   user_type: 'PARTICIPANT' | 'ALUMNI' | 'STAFF';
   student_id_code?: string | null;
   must_change_password?: boolean;
@@ -37,6 +39,25 @@ interface AuthState {
   resetAuth: () => void;
 }
 
+const normalizeRole = (role?: string | null): UserProfile['role'] => {
+  const value = String(role || '').trim().toLowerCase();
+  const mapping: Record<string, UserProfile['role']> = {
+    student: 'participant',
+    participant: 'participant',
+    event_coordinator: 'coordinator',
+    coordinator: 'coordinator',
+    special_user: 'coordinator',
+    junior_attendance: 'coordinator',
+    registration_desk: 'registration_desk',
+    desk: 'registration_desk',
+    admin: 'admin',
+    super_admin: 'admin',
+    admin_power: 'admin',
+  };
+
+  return mapping[value] || 'participant';
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
   isInitialized: false,
   isAuthenticated: !!localStorage.getItem('token'),
@@ -47,7 +68,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setAuth: (isAuthenticated, token, user = null) => {
     const safeUser = user ? {
       ...user,
-      role: String(user.role || 'student').toLowerCase(),
+      role: normalizeRole(user.role),
     } : null;
 
     if (token) {
@@ -66,15 +87,20 @@ export const useAuthStore = create<AuthState>((set) => ({
 }));
 
 // ── Role helpers ────────────────────────────────────────────────────────────
-const ADMIN_ROLES = ['admin', 'super_admin', 'admin_power'] as const;
-const COORD_ROLES = ['event_coordinator', 'special_user', 'junior_attendance'] as const;
+const ADMIN_ROLES = ['admin'] as const;
+const COORD_ROLES = ['coordinator'] as const;
+const REGISTRATION_DESK_ROLES = ['registration_desk'] as const;
+const PARTICIPANT_ROLES = ['participant'] as const;
 
 export const isAdminRole = (role?: string | null): boolean =>
-  ADMIN_ROLES.includes(role as any);
+  ADMIN_ROLES.includes((normalizeRole(role) as typeof ADMIN_ROLES[number]));
 
 export const isCoordinatorRole = (role?: string | null): boolean =>
-  COORD_ROLES.includes(role as any);
+  COORD_ROLES.includes((normalizeRole(role) as typeof COORD_ROLES[number]));
+
+export const isRegistrationDeskRole = (role?: string | null): boolean =>
+  REGISTRATION_DESK_ROLES.includes((normalizeRole(role) as typeof REGISTRATION_DESK_ROLES[number]));
 
 export const isStudentRole = (role?: string | null): boolean =>
-  role === 'student';
+  PARTICIPANT_ROLES.includes((normalizeRole(role) as typeof PARTICIPANT_ROLES[number]));
 

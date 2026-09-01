@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore, isAdminRole, isCoordinatorRole } from '../store/authStore';
+import { useAuthStore, isAdminRole, isCoordinatorRole, isRegistrationDeskRole } from '../store/authStore';
 import { api } from '../services/api';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -47,7 +47,9 @@ const coordinatorNavItems = [
 
 const roleLabel = (role?: string | null) => {
   if (isAdminRole(role)) return { text: 'ADMIN', color: '#E01B22' };
+  if (isRegistrationDeskRole(role)) return { text: 'REGISTRATION DESK', color: '#E08A17' };
   if (isCoordinatorRole(role)) return { text: 'COORDINATOR', color: '#E08A17' };
+  if (String(role || '').toLowerCase() === 'alumni') return { text: 'ALUMNI', color: '#E08A17' };
   return { text: 'PARTICIPANT', color: '#1FA971' };
 };
 
@@ -58,10 +60,11 @@ export const DashboardLayout: React.FC = () => {
   const { user, resetAuth } = useAuthStore();
 
   const isAdmin = isAdminRole(user?.role);
+  const isDesk = isRegistrationDeskRole(user?.role);
   const isCoord = isCoordinatorRole(user?.role);
 
   // Determine which nav set to show
-  const rawNavItems = isAdmin
+  const rawNavItems = isAdmin || isDesk
     ? adminNavItems
     : isCoord
     ? coordinatorNavItems
@@ -90,7 +93,7 @@ export const DashboardLayout: React.FC = () => {
       return res.data;
     },
     refetchInterval: 30000,
-    enabled: !isAdmin && !isCoord, // only participants get notification badge
+    enabled: !isAdmin && !isDesk && !isCoord, // only participants get notification badge
   });
   const unreadCount = unreadData?.count || 0;
 
@@ -116,7 +119,7 @@ export const DashboardLayout: React.FC = () => {
         <h1 className="text-xl font-display font-bold text-[#E01B22] tracking-widest">LOGIN 2K26</h1>
         <div className="h-px bg-[#2A1A1D] my-2" />
         <p className="text-[10px] font-mono text-[#A79798] uppercase tracking-widest">
-          {isAdmin ? 'ADMIN PANEL' : isCoord ? 'COORDINATOR PANEL' : 'PARTICIPANT PANEL'}
+          {isAdmin || isDesk ? 'ADMIN PANEL' : isCoord ? 'COORDINATOR PANEL' : 'PARTICIPANT PANEL'}
         </p>
       </div>
 
@@ -177,7 +180,7 @@ export const DashboardLayout: React.FC = () => {
       {/* Bottom: section label + logout */}
       <div className="p-3 border-t border-[#2A1A1D] space-y-1">
         <p className="text-[9px] font-mono text-[#3E2529] uppercase tracking-widest px-4 pb-1">
-          {isAdmin ? 'Admin Portal' : isCoord ? 'Coordinator Portal' : 'Participant Portal'}
+          {isAdmin || isDesk ? 'Admin Portal' : isCoord ? 'Coordinator Portal' : 'Participant Portal'}
         </p>
         <button
           onClick={handleLogout}
