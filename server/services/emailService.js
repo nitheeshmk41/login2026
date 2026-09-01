@@ -1,6 +1,65 @@
 const nodemailer = require("nodemailer");
 const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
 
+const BRAND = {
+  bg: '#0A0607',
+  panel: '#130C0E',
+  border: '#2A1A1D',
+  red: '#E01B22',
+  redSoft: '#FF2A2A',
+  gold: '#E08A17',
+  green: '#1FA971',
+  text: '#F7F2F2',
+  muted: '#A79798',
+  accent: '#1A0306',
+};
+
+const escapeHtml = (value = '') => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const renderBrandTemplate = ({ title, subtitle, preview, body, ctaText, ctaLink }) => `
+  <div style="margin:0;padding:0;background:${BRAND.bg};font-family:'Segoe UI',Arial,sans-serif; color:${BRAND.text};">
+    <div style="max-width:640px;margin:0 auto;padding:32px 20px;">
+      <div style="background:${BRAND.panel};border:1px solid ${BRAND.border};border-radius:8px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg, ${BRAND.red} 0%, #26080C 100%);padding:24px 28px 20px;">
+          <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:${BRAND.text};opacity:0.9;font-weight:700;">
+            LOGIN 2K26
+          </div>
+          <div style="font-size:11px;letter-spacing:2px;color:${BRAND.text};opacity:0.75;margin-top:8px;font-family:monospace;">
+            ${escapeHtml(subtitle || 'Department of Computer Applications • PSG College of Technology')}
+          </div>
+        </div>
+
+        <div style="padding:28px 28px 8px;">
+          <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-weight:700; margin-bottom:8px; font-family:monospace;">
+            ${escapeHtml(preview || 'OFFICIAL EMAIL')}
+          </div>
+          <h1 style="margin:0 0 10px; font-size:30px; line-height:1.2; color:${BRAND.text};">${escapeHtml(title)}</h1>
+          <div style="height:2px;width:80px;background:${BRAND.red};margin:14px 0 18px;border-radius:999px;"></div>
+          ${body}
+        </div>
+
+        ${ctaText && ctaLink ? `
+          <div style="padding:0 28px 28px;">
+            <a href="${ctaLink}" style="display:inline-block;background:${BRAND.red};color:${BRAND.text};text-decoration:none;padding:14px 22px;border-radius:4px;font-weight:700;letter-spacing:1px;font-size:12px;text-transform:uppercase;">
+              ${escapeHtml(ctaText)}
+            </a>
+          </div>
+        ` : ''}
+
+        <div style="padding:0 28px 28px; color:${BRAND.muted}; font-size:12px; line-height:1.7; border-top:1px solid ${BRAND.border}; margin-top:16px;">
+          For assistance, contact <a href="mailto:login@psgtech.ac.in" style="color:${BRAND.red}; text-decoration:none;">login@psgtech.ac.in</a><br/>
+          Organized by Department of Computer Applications, PSG College of Technology.
+        </div>
+      </div>
+    </div>
+  </div>
+`;
+
 const createTransporter = () => {
   if (process.env.SMTP_HOST && process.env.SMTP_USER) {
     return nodemailer.createTransport({
@@ -31,156 +90,322 @@ const sendEmail = async ({ to, subject, html, text }) => {
       });
       console.log(`[Email Sent from login@psgtech.ac.in] To: ${to} | Subject: ${subject} | ID: ${info.messageId}`);
       return info;
-    } else {
-      console.log(`[Email Logged (Sender: login@psgtech.ac.in)] To: ${to} | Subject: ${subject}`);
-      return { mock: true, from: 'login@psgtech.ac.in' };
     }
+
+    console.log(`[Email Logged (Sender: login@psgtech.ac.in)] To: ${to} | Subject: ${subject}`);
+    return { mock: true, from: 'login@psgtech.ac.in' };
   } catch (error) {
     console.error(`[Email Error] To: ${to} | Error:`, error.message);
     return { error: error.message };
   }
 };
 
+const sendOtpEmail = async (to, otp, expiryMinutes = 10) => {
+  const subject = '[LOGIN 2026] Your verification OTP';
+  const html = renderBrandTemplate({
+    title: 'VERIFY YOUR ACCOUNT',
+    subtitle: 'LOGIN 2K26 • Secure registration step',
+    preview: 'OTP VERIFICATION',
+    body: `
+      <p style="margin:0 0 16px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello,<br /><br />
+        Use the one-time password below to continue your LOGIN 2K26 registration.
+      </p>
+      <div style="background:${BRAND.accent};border:1px solid ${BRAND.red};padding:22px 18px;border-radius:6px;text-align:center;margin:20px 0;">
+        <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:${BRAND.gold};margin-bottom:10px;font-family:monospace;">Your OTP</div>
+        <div style="font-size:34px;letter-spacing:6px;font-weight:800;color:${BRAND.text};font-family:monospace;">${escapeHtml(otp)}</div>
+      </div>
+      <p style="margin:0; font-size:13px; line-height:1.7; color:${BRAND.muted};">
+        This code expires in ${expiryMinutes} minutes. Never share it with anyone.
+      </p>
+    `,
+  });
+
+  return sendEmail({ to, subject, html });
+};
+
+const sendWelcomeEmail = async ({ to, name, loginId, password, loginUrl = `${frontendUrl}/login` }) => {
+  const subject = '[LOGIN 2026] Welcome! Your Participant ID & Credentials';
+  const html = renderBrandTemplate({
+    title: 'WELCOME TO LOGIN 2K26',
+    subtitle: 'Department of Computer Applications • PSG College of Technology',
+    preview: 'PARTICIPANT ACCOUNT READY',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(name)}</strong>,
+      </p>
+      <p style="margin:0 0 22px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Your participant account has been created successfully. Use the details below to log in and continue your LOGIN 2K26 journey.
+      </p>
+      <div style="background:${BRAND.panel};border:1px solid ${BRAND.border};padding:22px;border-radius:6px;margin-bottom:20px;">
+        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;margin-bottom:8px;">Login ID</div>
+        <div style="font-size:30px;letter-spacing:3px;font-weight:800;color:${BRAND.red};font-family:monospace;">${escapeHtml(loginId)}</div>
+        <div style="margin-top:18px;font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Password</div>
+        <div style="font-size:22px;letter-spacing:2px;font-weight:700;color:${BRAND.text};font-family:monospace;margin-top:6px;">${escapeHtml(password)}</div>
+      </div>
+    `,
+    ctaText: 'LOGIN TO PORTAL',
+    ctaLink: loginUrl,
+  });
+
+  return sendEmail({ to, subject, html });
+};
+
+const sendAlumniWelcomeEmail = async ({ name, email, batchYear, calendarUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=LOGIN+2K26+35th+Edition+Alumni+Reunion&dates=20260918T033000Z/20260919T113000Z&details=Welcome+back+to+PSG+Tech+for+the+35th+Edition+of+LOGIN+2K26+National+Cyber+Symposium!&location=PSG+College+of+Technology,+Coimbatore' }) => {
+  const subject = '[LOGIN 2K26] Welcome Back, Alumni! Confirmation';
+  const html = renderBrandTemplate({
+    title: 'WELCOME BACK, ALUMNI',
+    subtitle: '35TH EDITION • RECONNECT. RELIVE. INSPIRE.',
+    preview: 'ALUMNI REGISTRATION CONFIRMED',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Dear <strong style="color:${BRAND.text};">${escapeHtml(name)}</strong>,
+      </p>
+      <p style="margin:0 0 22px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        We are delighted to welcome you back for the 35th Edition of LOGIN 2K26. Your alumni RSVP has been successfully confirmed.
+      </p>
+      <div style="background:${BRAND.accent};border:1px solid ${BRAND.gold};padding:20px;border-radius:6px;margin-bottom:20px;">
+        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Batch / Year</div>
+        <div style="font-size:24px;font-weight:800;color:${BRAND.text};margin-top:8px;">${escapeHtml(batchYear || 'Alumni')}</div>
+      </div>
+      <p style="margin:0; font-size:14px; line-height:1.7; color:${BRAND.muted};">
+        Mark your calendar for 18–19 September 2026 and reconnect with the legacy of PSG Tech.
+      </p>
+    `,
+    ctaText: 'ADD TO GOOGLE CALENDAR',
+    ctaLink: calendarUrl,
+  });
+
+  return sendEmail({ to: email, subject, html });
+};
+
+const sendTeamInvitationEmail = async ({ to, toName, senderName, senderLoginId, teamName, eventName, acceptUrl }) => {
+  const subject = `[LOGIN 2026] Team Invitation: ${escapeHtml(teamName)}`;
+  const html = renderBrandTemplate({
+    title: 'TEAM INVITATION',
+    subtitle: 'LOGIN 2K26 • Collaboration for the arena',
+    preview: 'TEAM INVITE',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(toName)}</strong>,
+      </p>
+      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        <strong style="color:${BRAND.text};">${escapeHtml(senderName)}</strong> (${escapeHtml(senderLoginId)}) has invited you to join <strong style="color:${BRAND.text};">${escapeHtml(teamName)}</strong> for <strong style="color:${BRAND.text};">${escapeHtml(eventName)}</strong>.
+      </p>
+      <div style="background:${BRAND.panel};border-left:4px solid ${BRAND.red};padding:18px;border-radius:4px;margin:18px 0;">
+        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Team</div>
+        <div style="font-size:24px;font-weight:800;color:${BRAND.text};margin-top:8px;">${escapeHtml(teamName)}</div>
+        <div style="margin-top:12px;color:${BRAND.muted};font-size:14px;">Event: <strong style="color:${BRAND.text};">${escapeHtml(eventName)}</strong></div>
+      </div>
+    `,
+    ctaText: 'ACCEPT INVITATION',
+    ctaLink: acceptUrl,
+  });
+
+  return sendEmail({ to, subject, html });
+};
+
+const sendPaymentPendingEmail = async ({ to, name, eventName, portalUrl = `${frontendUrl}/dashboard` }) => {
+  const subject = `[LOGIN 2026] Payment Pending: ${eventName}`;
+  const html = renderBrandTemplate({
+    title: 'PAYMENT PENDING',
+    subtitle: 'Your registration is saved, verification is still pending',
+    preview: 'PAYMENT STATUS',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(name)}</strong>,
+      </p>
+      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Your registration for <strong style="color:${BRAND.text};">${escapeHtml(eventName)}</strong> is recorded, but payment verification is still pending.
+      </p>
+      <div style="background:rgba(224,27,34,0.12);border:1px solid ${BRAND.red};padding:18px;border-radius:6px;margin:20px 0;">
+        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Action required</div>
+        <p style="margin:10px 0 0; font-size:14px; line-height:1.7; color:${BRAND.text};">
+          Please confirm your UTR / payment reference on the portal dashboard so the admin team can verify your participation.
+        </p>
+      </div>
+    `,
+    ctaText: 'GO TO DASHBOARD',
+    ctaLink: portalUrl,
+  });
+
+  return sendEmail({ to, subject, html });
+};
+
+const sendPaymentVerifiedEmail = async ({ to, name, studentIdCode, portalUrl = `${frontendUrl}/dashboard` }) => {
+  const subject = `[LOGIN 2026] Payment Verified! Your Student ID is ${studentIdCode}`;
+  const html = renderBrandTemplate({
+    title: 'PAYMENT VERIFIED',
+    subtitle: 'Your registration is now fully approved',
+    preview: 'VERIFIED',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(name)}</strong>,
+      </p>
+      <p style="margin:0 0 20px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Your LOGIN 2026 payment has been verified by the organizing committee.
+      </p>
+      <div style="background:rgba(31,169,113,0.12);border:1px solid ${BRAND.green};padding:20px;border-radius:6px;text-align:center;margin:20px 0;">
+        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Official Student ID</div>
+        <div style="font-size:28px;letter-spacing:3px;font-weight:800;color:${BRAND.text};font-family:monospace;margin-top:10px;">${escapeHtml(studentIdCode)}</div>
+      </div>
+      <p style="margin:0; font-size:14px; line-height:1.7; color:${BRAND.muted};">
+        You can now continue with event registration and portal access without any blockers.
+      </p>
+    `,
+    ctaText: 'OPEN DASHBOARD',
+    ctaLink: portalUrl,
+  });
+
+  return sendEmail({ to, subject, html });
+};
+
 const sendEventRegistrationConfirmation = async (user, event, team = null) => {
   const paymentModel = require("../models/postgres/paymentModel");
   let isVerified = false;
-  let paymentStatus = "PENDING";
-  
+
   try {
     const payment = await paymentModel.findOne({ where: { student_id: user.id } });
-    if (payment && payment.status === "VERIFIED") {
+    if (payment && payment.status === 'VERIFIED') {
       isVerified = true;
-      paymentStatus = "VERIFIED";
-    } else if (payment && payment.status === "PENDING") {
-      paymentStatus = "PENDING_VERIFICATION";
     }
   } catch (err) {
     // fallback
   }
 
-  const subject = `[LOGIN 2026] Event Registration Confirmed: ${event.name} (${isVerified ? 'VERIFIED' : 'PAYMENT PENDING'})`;
-  const html = `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #0A0607; color: #F7F2F2; padding: 32px; border-radius: 6px; max-width: 600px; margin: 0 auto; border: 1px solid #2A1A1D;">
-      <div style="border-bottom: 2px solid #E01B22; padding-bottom: 16px; margin-bottom: 24px;">
-        <h1 style="color: #E01B22; margin: 0; font-size: 24px; letter-spacing: 2px;">LOGIN 2026</h1>
-        <p style="color: #A79798; margin: 6px 0 0 0; font-size: 12px; font-family: monospace;">Department of Computer Applications • PSG College of Technology</p>
-        <p style="color: #FF2A2A; margin: 4px 0 0 0; font-size: 11px; font-family: monospace;">Sender: login@psgtech.ac.in</p>
-      </div>
-
-      <h2 style="color: #F7F2F2; font-size: 20px; margin-top: 0;">Enrolment Confirmed: ${event.name}</h2>
-      <p style="color: #A79798; font-size: 14px; line-height: 1.6;">Hello <strong style="color: #F7F2F2;">${user.name}</strong>,</p>
-      <p style="color: #A79798; font-size: 14px; line-height: 1.6;">Your registration for <strong style="color: #FF2A2A;">${event.name}</strong> has been successfully recorded in the symposium ledger.</p>
-
-      <!-- Verification Status Callout -->
-      ${isVerified ? `
-        <div style="background: rgba(31, 169, 113, 0.15); border: 1px solid #1FA971; padding: 14px; margin: 20px 0; border-radius: 4px; color: #1FA971; font-size: 13px;">
-          <strong>✓ PARTICIPANT PAYMENT STATUS: VERIFIED</strong><br/>
-          Official Survivor ID: <strong>${user.student_id_code || 'LGN26-VERIFIED'}</strong>. Your competition slot and accreditation are fully active.
-        </div>
-      ` : `
-        <div style="background: rgba(224, 27, 34, 0.15); border: 1px solid #E01B22; padding: 14px; margin: 20px 0; border-radius: 4px; color: #FF2A2A; font-size: 13px;">
-          <strong>⚠ PARTICIPANT PAYMENT STATUS: PENDING / UNVERIFIED</strong><br/>
-          Your event registration is saved, but your symposium fee (₹150) verification is pending. Please submit your UTR reference on your portal dashboard so the admin committee can verify and issue your official Student ID.
-        </div>
-      `}
-
-      <!-- Event Details Box -->
-      <div style="background: #130C0E; border: 1px solid #2A1A1D; border-left: 4px solid #E01B22; padding: 18px; margin: 20px 0; border-radius: 4px; font-size: 13px; line-height: 1.8;">
-        <p style="margin: 4px 0;"><strong style="color: #A79798;">Participant ID:</strong> <span style="color: #F7F2F2; font-family: monospace;">${user.student_id_code || 'Pending Verification'}</span></p>
-        <p style="margin: 4px 0;"><strong style="color: #A79798;">Arena Category:</strong> <span style="color: #F7F2F2;">${event.category === 'TECHNICAL' ? 'Technical Arena' : 'Non-Technical Arena'}</span></p>
-        <p style="margin: 4px 0;"><strong style="color: #A79798;">Symposium Day:</strong> <span style="color: #F7F2F2;">Day ${event.day} (18–19 September 2026)</span></p>
-        <p style="margin: 4px 0;"><strong style="color: #A79798;">Reporting Time:</strong> <span style="color: #F7F2F2; font-family: monospace;">${event.start_time ? event.start_time.slice(0, 5) : '09:00'} IST</span></p>
-        <p style="margin: 4px 0;"><strong style="color: #A79798;">Venue Desk:</strong> <span style="color: #F7F2F2;">${event.venue || 'Dept. of Computer Applications, PSG Tech'}</span></p>
-        ${team ? `<p style="margin: 4px 0;"><strong style="color: #A79798;">Squad / Team:</strong> <span style="color: #E08A17; font-weight: bold;">${team.name}</span></p>` : ''}
-      </div>
-
-      <p style="color: #6B5A5C; font-size: 12px; margin-top: 24px; border-top: 1px solid #2A1A1D; pt: 16px;">
-        For assistance, contact the organizing team at <a href="mailto:login@psgtech.ac.in" style="color: #E01B22;">login@psgtech.ac.in</a>.
+  const subject = `[LOGIN 2026] ${isVerified ? 'Registration Confirmed' : 'Registration Received - Payment Pending'}: ${event.name}`;
+  const html = renderBrandTemplate({
+    title: isVerified ? 'REGISTRATION CONFIRMED' : 'REGISTRATION RECEIVED',
+    subtitle: isVerified ? 'Your participation is active and verified.' : 'Payment verification is pending for your slot.',
+    preview: isVerified ? 'CONFIRMED' : 'PAYMENT PENDING',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(user.name)}</strong>,
       </p>
-    </div>
-  `;
+      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Your registration for <strong style="color:${BRAND.text};">${escapeHtml(event.name)}</strong> has been recorded successfully in the LOGIN 2K26 system.
+      </p>
+      <div style="background:${isVerified ? 'rgba(31,169,113,0.12)' : 'rgba(224,27,34,0.12)'};border:1px solid ${isVerified ? BRAND.green : BRAND.red};padding:18px;border-radius:6px;margin-bottom:18px;">
+        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Status</div>
+        <p style="margin:10px 0 0; font-size:14px; color:${BRAND.text};line-height:1.7;">
+          ${isVerified
+            ? `Verified: Your participation is now active and ready for event access.`
+            : `Pending verification: Please submit your UTR reference in the dashboard so the committee can validate your payment.`}
+        </p>
+      </div>
+      <div style="background:${BRAND.panel};border:1px solid ${BRAND.border};padding:18px;border-radius:6px;">
+        <div style="color:${BRAND.muted};font-size:12px;line-height:1.8;">
+          <div>Participant ID: <strong style="color:${BRAND.text};">${escapeHtml(user.student_id_code || 'Pending Verification')}</strong></div>
+          <div>Category: <strong style="color:${BRAND.text};">${escapeHtml(event.category === 'TECHNICAL' ? 'Technical Arena' : 'Non-Technical Arena')}</strong></div>
+          <div>Day: <strong style="color:${BRAND.text};">Day ${event.day} (18–19 September 2026)</strong></div>
+          <div>Venue: <strong style="color:${BRAND.text};">${escapeHtml(event.venue || 'Dept. of Computer Applications, PSG Tech')}</strong></div>
+          ${team ? `<div>Team: <strong style="color:${BRAND.gold};">${escapeHtml(team.name)}</strong></div>` : ''}
+        </div>
+      </div>
+    `,
+    ctaText: isVerified ? 'VIEW DASHBOARD' : 'SUBMIT PAYMENT',
+    ctaLink: `${frontendUrl}/dashboard`,
+  });
+
   return sendEmail({ to: user.email, subject, html });
 };
 
 const sendEventChangeNotification = async (user, event, changes) => {
   const subject = `[LOGIN 2026] URGENT ALERT: Venue/Time Update for ${event.name}`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; background-color: #0A0A0C; color: #F2F2F4; padding: 24px; border-radius: 8px;">
-      <div style="border-bottom: 2px solid #E01B24; padding-bottom: 12px; margin-bottom: 20px;">
-        <h1 style="color: #E01B24; margin: 0;">LOGIN 2026 — VENUE & TIME UPDATE ALERT</h1>
-        <p style="color: #9A9AA2; margin: 4px 0 0 0;">Sender: login@psgtech.ac.in</p>
+  const html = renderBrandTemplate({
+    title: 'SCHEDULE UPDATE',
+    subtitle: 'LOGIN 2026 • Important venue or timing notice',
+    preview: 'EVENT ALERT',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(user.name)}</strong>,
+      </p>
+      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Please note that the schedule or venue details for <strong style="color:${BRAND.text};">${escapeHtml(event.name)}</strong> have been updated by the organizing committee.
+      </p>
+      <div style="background:${BRAND.panel};border-left:4px solid ${BRAND.red};padding:18px;border-radius:4px;">
+        <div>Event Arena: <strong style="color:${BRAND.text};">${escapeHtml(event.name)}</strong></div>
+        <div style="margin-top:8px;">New Venue: <strong style="color:${BRAND.text};">${escapeHtml(event.venue || 'Check Portal Dashboard')}</strong></div>
+        <div style="margin-top:8px;">New Start Time: <strong style="color:${BRAND.text};">${escapeHtml(event.start_time || 'Check Portal Schedule')} IST</strong></div>
+        <div style="margin-top:8px;">Day: <strong style="color:${BRAND.text};">Day ${event.day} (18–19 September 2026)</strong></div>
       </div>
+    `,
+    ctaText: 'VIEW SCHEDULE',
+    ctaLink: `${frontendUrl}/dashboard`,
+  });
 
-      <h2>Attention: Schedule/Venue Change Notice</h2>
-      <p>Hello <strong>${user.name}</strong>,</p>
-      <p>Please note that the schedule/venue details for your registered competition arena <strong>${event.name}</strong> have been updated by the organizing committee.</p>
-
-      <div style="background: #141418; border-left: 4px solid #E01B24; padding: 16px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 4px 0;"><strong>Event Arena:</strong> ${event.name}</p>
-        <p style="margin: 4px 0; color: #E01B24;"><strong>New Venue:</strong> ${event.venue || "Check Portal Dashboard"}</p>
-        <p style="margin: 4px 0; color: #E01B24;"><strong>New Start Time:</strong> ${event.start_time || "Check Portal Schedule"} IST</p>
-        <p style="margin: 4px 0;"><strong>Day:</strong> Day ${event.day} (18-19 September 2026)</p>
-      </div>
-
-      <p style="color: #9A9AA2; font-size: 14px;">Log in to your Survivor Dossier at ${frontendUrl}/dashboard for real-time venue maps and schedule updates.</p>
-    </div>
-  `;
   return sendEmail({ to: user.email, subject, html });
 };
 
 const sendEventReminderEmail = async (user, event) => {
   const subject = `[LOGIN 2026 REMINDER] Upcoming Competition Arena: ${event.name}`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; background-color: #0A0A0C; color: #F2F2F4; padding: 24px; border-radius: 8px;">
-      <h2 style="color: #E01B24;">LOGIN 2026 Event Reminder</h2>
-      <p>Hello <strong>${user.name}</strong>,</p>
-      <p>This is a reminder for your upcoming event <strong>${event.name}</strong> on Day ${event.day}.</p>
-      <div style="background: #141418; border: 1px solid #E01B24; padding: 16px; margin: 20px 0;">
-        <p style="margin: 4px 0;"><strong>Venue:</strong> ${event.venue}</p>
-        <p style="margin: 4px 0;"><strong>Time:</strong> ${event.start_time} IST</p>
-        <p style="margin: 4px 0;"><strong>Student ID:</strong> ${user.student_id_code}</p>
+  const html = renderBrandTemplate({
+    title: 'EVENT REMINDER',
+    subtitle: 'Your LOGIN 2026 slot is coming up',
+    preview: 'REMINDER',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(user.name)}</strong>,
+      </p>
+      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        This is a reminder for your upcoming event <strong style="color:${BRAND.text};">${escapeHtml(event.name)}</strong>.
+      </p>
+      <div style="background:${BRAND.panel};border:1px solid ${BRAND.red};padding:18px;border-radius:6px;">
+        <div>Venue: <strong style="color:${BRAND.text};">${escapeHtml(event.venue)}</strong></div>
+        <div style="margin-top:8px;">Time: <strong style="color:${BRAND.text};">${escapeHtml(event.start_time)} IST</strong></div>
+        <div style="margin-top:8px;">Student ID: <strong style="color:${BRAND.text};">${escapeHtml(user.student_id_code)}</strong></div>
       </div>
-    </div>
-  `;
+    `,
+  });
+
   return sendEmail({ to: user.email, subject, html });
 };
 
 const sendPaymentVerificationEmail = async (user, studentIdCode) => {
-  const subject = `[LOGIN 2026] Payment Verified! Your Student ID is ${studentIdCode}`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; background-color: #0A0A0C; color: #F2F2F4; padding: 24px; border-radius: 8px;">
-      <h1 style="color: #1FA971; margin: 0;">Payment Verified ✓</h1>
-      <p>Hello <strong>${user.name}</strong>,</p>
-      <p>Your registration payment for LOGIN 2026 has been verified by the admin team!</p>
-      <div style="background: #141418; border: 1px solid #1FA971; padding: 16px; margin: 20px 0; text-align: center; border-radius: 4px;">
-        <span style="font-size: 14px; color: #9A9AA2;">Your Official Student ID:</span>
-        <h2 style="color: #1FA971; font-size: 28px; margin: 8px 0; letter-spacing: 2px;">${studentIdCode}</h2>
-      </div>
-      <p>You can now proceed to register for events on the LOGIN 2026 portal.</p>
-    </div>
-  `;
-  return sendEmail({ to: user.email, subject, html });
+  return sendPaymentVerifiedEmail({
+    to: user.email,
+    name: user.name,
+    studentIdCode,
+    portalUrl: `${frontendUrl}/dashboard`,
+  });
 };
 
 const sendCoordinatorCredentialsEmail = async (user, defaultPassword, eventName) => {
-  const subject = `[LOGIN 2026] Coordinator Account Provisioned`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; background-color: #0A0A0C; color: #F2F2F4; padding: 24px; border-radius: 8px;">
-      <h1 style="color: #E01B24; margin: 0;">Coordinator Portal Access</h1>
-      <p>Hello <strong>${user.name}</strong>,</p>
-      <p>You have been assigned as Event Coordinator for <strong>${eventName}</strong>.</p>
-      <div style="background: #141418; border: 1px solid #2A1416; padding: 16px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 4px 0;"><strong>Email:</strong> ${user.email}</p>
-        <p style="margin: 4px 0;"><strong>Temporary Password:</strong> ${defaultPassword}</p>
+  const subject = '[LOGIN 2026] Coordinator Account Provisioned';
+  const html = renderBrandTemplate({
+    title: 'COORDINATOR ACCESS',
+    subtitle: 'LOGIN 2026 • Portal credentials assigned',
+    preview: 'COORDINATOR PORTAL',
+    body: `
+      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        Hello <strong style="color:${BRAND.text};">${escapeHtml(user.name)}</strong>,
+      </p>
+      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
+        You have been assigned as an event coordinator for <strong style="color:${BRAND.text};">${escapeHtml(eventName)}</strong>.
+      </p>
+      <div style="background:${BRAND.panel};border:1px solid ${BRAND.border};padding:18px;border-radius:6px;">
+        <div>Email: <strong style="color:${BRAND.text};">${escapeHtml(user.email)}</strong></div>
+        <div style="margin-top:8px;">Temporary Password: <strong style="color:${BRAND.text};">${escapeHtml(defaultPassword)}</strong></div>
       </div>
-      <p style="color: #E8A317;"><strong>Important:</strong> You will be required to change your password immediately upon your first login.</p>
-    </div>
-  `;
+      <p style="margin:16px 0 0; font-size:14px; line-height:1.7; color:${BRAND.gold};">
+        Important: change your password on your first login.
+      </p>
+    `,
+    ctaText: 'LOGIN TO PORTAL',
+    ctaLink: `${frontendUrl}/login`,
+  });
+
   return sendEmail({ to: user.email, subject, html });
 };
 
 module.exports = {
   sendEmail,
+  sendOtpEmail,
+  sendWelcomeEmail,
+  sendAlumniWelcomeEmail,
+  sendTeamInvitationEmail,
+  sendPaymentPendingEmail,
+  sendPaymentVerifiedEmail,
   sendEventRegistrationConfirmation,
   sendEventChangeNotification,
   sendEventReminderEmail,

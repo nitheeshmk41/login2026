@@ -6,7 +6,7 @@ const teamRequestModel = require("../../models/postgres/teamRequestModel");
 const eventModel = require("../../models/postgres/eventModel");
 const userModel = require("../../models/postgres/userModel");
 const notificationModel = require("../../models/postgres/notificationModel");
-const { sendEmail } = require("../../services/emailService");
+const { sendEmail, sendTeamInvitationEmail } = require("../../services/emailService");
 
 // ──────────────────────────────────────────────
 // Helper: create in-app notification
@@ -273,21 +273,14 @@ const inviteMember = async (req, res) => {
 
     // Email notification
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    sendEmail({
+    sendTeamInvitationEmail({
       to: targetUser.email,
-      subject: `[LOGIN 2026] Team Invitation: ${team.name}`,
-      html: `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #0A0607; color: #F7F2F2; padding: 32px; max-width: 600px; margin: 0 auto; border: 1px solid #2A1A1D;">
-          <h1 style="color: #E01B22; font-size: 20px;">Team Invitation</h1>
-          <p>Hello <strong>${targetUser.name}</strong>,</p>
-          <p><strong>${sender.name}</strong> (${sender.login_id}) has invited you to join:</p>
-          <div style="background: #130C0E; border: 1px solid #E01B22; padding: 16px; margin: 16px 0;">
-            <p style="margin: 4px 0;"><strong>Team:</strong> ${team.name}</p>
-            <p style="margin: 4px 0;"><strong>Event:</strong> ${team.event.name}</p>
-          </div>
-          <p><a href="${frontendUrl}/dashboard/teams" style="display: inline-block; padding: 10px 24px; background: #E01B22; color: #F7F2F2; text-decoration: none; font-weight: bold;">Accept Invitation</a></p>
-        </div>
-      `,
+      toName: targetUser.name,
+      senderName: sender.name,
+      senderLoginId: sender.login_id,
+      teamName: team.name,
+      eventName: team.event.name,
+      acceptUrl: `${frontendUrl}/dashboard/teams`,
     });
 
     return res.status(201).json({ message: "Invitation sent", invitation });

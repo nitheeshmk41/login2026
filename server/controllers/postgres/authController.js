@@ -8,7 +8,12 @@ const registrationModel = require("../../models/postgres/registrationModel");
 const teamModel = require("../../models/postgres/teamModel");
 const teamMemberModel = require("../../models/postgres/teamMemberModel");
 const otpModel = require("../../models/postgres/otpModel");
-const { sendEmail } = require("../../services/emailService");
+const {
+  sendEmail,
+  sendOtpEmail,
+  sendWelcomeEmail,
+  sendAlumniWelcomeEmail,
+} = require("../../services/emailService");
 const alumniModel = require("../../models/postgres/alumniModel");
 
 const jwtSecret = process.env.JWT_SECRET || "super_secret_jwt_key_login_2026";
@@ -92,20 +97,7 @@ const sendOtp = async (req, res) => {
       await otpModel.create({ email: email.toLowerCase(), otp, expires_at: expiresAt });
     }
 
-    await sendEmail({
-      to: email,
-      subject: "[LOGIN 2026] Your Verification OTP",
-      html: `
-        <div style="font-family: Arial, sans-serif; background-color: #0A0607; color: #F7F2F2; padding: 24px; border-radius: 6px; border: 1px solid #2A1A1D; text-align: center;">
-          <h2 style="color: #E01B22; margin-top: 0;">LOGIN 2026 Verification</h2>
-          <p>Your OTP code is:</p>
-          <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #F7F2F2; background: #130C0E; padding: 16px; display: inline-block; border: 1px solid #E01B22; border-radius: 4px; margin: 16px 0;">
-            ${otp}
-          </div>
-          <p style="color: #A79798; font-size: 14px;">This code expires in 10 minutes. Do not share it with anyone.</p>
-        </div>
-      `,
-    });
+    await sendOtpEmail(email, otp, 10);
 
     return res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {
@@ -234,10 +226,11 @@ const registerUser = async (req, res) => {
       }, { transaction });
       await transaction.commit();
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-      sendEmail({
-        to: finalEmail,
-        subject: "[LOGIN 2K26] Welcome Back, Alumni! Confirmation",
-        html: `<p>Welcome back, ${alumni.name}! Your LOGIN 2K26 alumni RSVP is confirmed.</p><p>Visit <a href="${frontendUrl}">${frontendUrl}</a> for event updates.</p>`,
+      sendAlumniWelcomeEmail({
+        name: alumni.name,
+        email: finalEmail,
+        batchYear: alumni.batch_year || 'Alumni',
+        calendarUrl: `https://calendar.google.com/calendar/render?action=TEMPLATE&text=LOGIN+2K26+35th+Edition+Alumni+Reunion&dates=20260918T033000Z/20260919T113000Z&details=Welcome+back+to+PSG+Tech+for+the+35th+Edition+of+LOGIN+2K26+National+Cyber+Symposium!&location=PSG+College+of+Technology,+Coimbatore`,
       }).catch((err) => console.error("Failed to send alumni welcome email:", err));
       return res.status(201).json({ message: "Alumni registration saved successfully." });
     }
@@ -274,83 +267,24 @@ const registerUser = async (req, res) => {
     // Send welcome email with calendar invite only if email is provided
     if (email) {
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-      const calendarLink = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=LOGIN+2K26+35th+Edition+Alumni+Reunion&dates=20260918T033000Z/20260919T113000Z&details=Welcome+back+to+PSG+Tech+for+the+35th+Edition+of+LOGIN+2K26+National+Cyber+Symposium!&location=PSG+College+of+Technology,+Coimbatore";
-      
-      const emailSubject = isAlumni
-        ? `[LOGIN 2K26] Welcome Back, Alumni! Confirmation & Event Calendar Reminder`
-        : `[LOGIN 2K26] Welcome! Your Participant ID & Credentials`;
+      const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=LOGIN+2K26+35th+Edition+Alumni+Reunion&dates=20260918T033000Z/20260919T113000Z&details=Welcome+back+to+PSG+Tech+for+the+35th+Edition+of+LOGIN+2K26+National+Cyber+Symposium!&location=PSG+College+of+Technology,+Coimbatore`;
 
-      const emailHtml = isAlumni ? `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #0A0607; color: #F7F2F2; padding: 32px; border-radius: 6px; max-width: 600px; margin: 0 auto; border: 1px solid #2A1A1D;">
-          <div style="border-bottom: 2px solid #E01B22; padding-bottom: 16px; margin-bottom: 24px; text-align: center;">
-            <h1 style="color: #E01B22; margin: 0; font-size: 26px; letter-spacing: 3px;">LOGIN 2K26</h1>
-            <p style="color: #E08A17; margin: 6px 0 0 0; font-size: 13px; font-family: monospace; font-weight: bold;">35TH EDITION • ALUMNI REUNION</p>
-            <p style="color: #A79798; margin: 4px 0 0 0; font-size: 11px;">Department of Computer Applications • PSG College of Technology</p>
-          </div>
-          
-          <h2 style="color: #F7F2F2; font-size: 22px; margin-top: 0; text-align: center;">WELCOME BACK, ${user.name.toUpperCase()}!</h2>
-          
-          <p style="color: #A79798; font-size: 14px; line-height: 1.6;">
-            We are honored to have you register for the <strong style="color: #F7F2F2;">35th Edition of LOGIN 2K26</strong>! You were part of the journey, and we are excited to have you back as part of the legacy.
-          </p>
-
-          <div style="background: #130C0E; border: 2px solid #E08A17; padding: 20px; margin: 24px 0; border-radius: 4px; text-align: center;">
-            <p style="color: #E08A17; font-size: 11px; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 2px; font-family: monospace;">Official Alumni Registration Pass</p>
-            <h3 style="color: #F7F2F2; font-size: 24px; margin: 0 0 8px 0; font-family: monospace;">${loginId}</h3>
-            <p style="color: #A79798; font-size: 12px; margin: 0;">Batch: <strong style="color: #F7F2F2;">${batch_year || 'Alumni'}</strong> • Location: <strong style="color: #F7F2F2;">${place || 'PSG Tech'}</strong></p>
-          </div>
-
-          <div style="background: #1A0306; border-left: 4px solid #E01B22; padding: 16px; margin-bottom: 24px; border-radius: 2px;">
-            <p style="color: #F7F2F2; font-size: 13px; margin: 0 0 6px 0; font-weight: bold;">📅 MARK YOUR CALENDAR</p>
-            <p style="color: #A79798; font-size: 12px; margin: 0;">Dates: September 18-19, 2026<br/>Venue: PSG College of Technology, Coimbatore</p>
-          </div>
-
-          <div style="margin: 32px 0; text-align: center;">
-            <a href="${calendarLink}" target="_blank" style="background-color: #E01B22; color: #F7F2F2; text-decoration: none; padding: 14px 28px; border-radius: 2px; font-weight: bold; font-family: monospace; letter-spacing: 1px; display: inline-block; box-shadow: 0 4px 15px rgba(224,27,34,0.4);">+ ADD TO GOOGLE CALENDAR</a>
-          </div>
-
-          <p style="color: #6B5A5C; font-size: 12px; margin-top: 24px; border-top: 1px solid #2A1A1D; padding-top: 16px; text-align: center;">
-            🔒 Your information is strictly used for LOGIN 2K26 coordination.<br/>
-            Organized by Department of Computer Applications, PSG College of Technology.
-          </p>
-        </div>
-      ` : `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #0A0607; color: #F7F2F2; padding: 32px; border-radius: 6px; max-width: 600px; margin: 0 auto; border: 1px solid #2A1A1D;">
-          <div style="border-bottom: 2px solid #E01B22; padding-bottom: 16px; margin-bottom: 24px;">
-            <h1 style="color: #E01B22; margin: 0; font-size: 24px; letter-spacing: 2px;">LOGIN 2K26</h1>
-            <p style="color: #A79798; margin: 6px 0 0 0; font-size: 12px; font-family: monospace;">Department of Computer Applications • PSG College of Technology</p>
-          </div>
-          <h2 style="color: #F7F2F2; font-size: 20px; margin-top: 0;">Welcome to LOGIN 2K26!</h2>
-          <p style="color: #A79798; font-size: 14px; line-height: 1.6;">Hello <strong style="color: #F7F2F2;">${user.name}</strong>,</p>
-          <p style="color: #A79798; font-size: 14px; line-height: 1.6;">Your participant account has been created successfully. Here are your login credentials:</p>
-          
-          <div style="background: #130C0E; border: 2px solid #E01B22; padding: 24px; margin: 24px 0; border-radius: 4px; text-align: center;">
-            <p style="color: #A79798; font-size: 12px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 2px;">Your Participant ID (Username)</p>
-            <h2 style="color: #E01B22; font-size: 32px; margin: 0 0 16px 0; letter-spacing: 4px; font-family: monospace;">${loginId}</h2>
-            
-            <p style="color: #A79798; font-size: 12px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 2px;">Your Password</p>
-            <div style="background: #0A0607; border: 1px dashed #E01B22; display: inline-block; padding: 8px 16px; color: #F7F2F2; font-family: monospace; font-size: 18px; letter-spacing: 2px;">
-              ${rawPassword}
-            </div>
-          </div>
-
-          <p style="color: #A79798; font-size: 14px; line-height: 1.6;">Use these credentials to log in at <a href="${frontendUrl}/login" style="color: #E01B22;">${frontendUrl}/login</a>.</p>
-          
-          <div style="margin: 32px 0; text-align: center;">
-            <a href="${calendarLink}" target="_blank" style="background-color: #E01B22; color: #F7F2F2; text-decoration: none; padding: 12px 24px; border-radius: 2px; font-weight: bold; font-family: monospace; letter-spacing: 1px; display: inline-block;">+ ADD TO GOOGLE CALENDAR</a>
-          </div>
-
-          <p style="color: #6B5A5C; font-size: 12px; margin-top: 24px; border-top: 1px solid #2A1A1D; padding-top: 16px;">
-            For assistance, contact the organizing team at <a href="mailto:login@psgtech.ac.in" style="color: #E01B22;">login@psgtech.ac.in</a>.
-          </p>
-        </div>
-      `;
-
-      sendEmail({
-        to: finalEmail,
-        subject: emailSubject,
-        html: emailHtml,
-      }).catch(err => console.error("Failed to send welcome email:", err));
+      if (isAlumni) {
+        sendAlumniWelcomeEmail({
+          name: user.name,
+          email: finalEmail,
+          batchYear: batch_year || 'Alumni',
+          calendarUrl: calendarLink,
+        }).catch((err) => console.error("Failed to send alumni welcome email:", err));
+      } else {
+        sendWelcomeEmail({
+          to: finalEmail,
+          name: user.name,
+          loginId,
+          password: password,
+          loginUrl: `${frontendUrl}/login`,
+        }).catch((err) => console.error("Failed to send welcome email:", err));
+      }
     }
 
     return res.status(201).json({

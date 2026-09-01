@@ -1,6 +1,6 @@
 const paymentModel = require("../../models/postgres/paymentModel");
 const userModel = require("../../models/postgres/userModel");
-const { sendPaymentVerificationEmail } = require("../../services/emailService");
+const { sendPaymentVerificationEmail, sendPaymentPendingEmail } = require("../../services/emailService");
 const { parseCsv, extractTransactionId } = require("../../utils/csvParser");
 const xlsx = require("xlsx");
 
@@ -91,6 +91,16 @@ const createPayment = async (req, res) => {
           payment_method: payment_method || "UPI",
           status: "PENDING",
         });
+
+    const user = await userModel.findByPk(req.user.id);
+    if (user) {
+      sendPaymentPendingEmail({
+        to: user.email,
+        name: user.name,
+        eventName: 'LOGIN 2026 Registration',
+        portalUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`,
+      }).catch(() => {});
+    }
 
     return res.status(201).json({
       message: "Payment reference submitted successfully. Pending admin verification.",
