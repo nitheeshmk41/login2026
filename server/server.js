@@ -84,8 +84,15 @@ const startServer = async () => {
     await safeAddColumn('users', 'accommodation_required', { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false });
 
     const seedEventCatalog = async () => {
-      const eventFile = path.resolve(__dirname, '../client/src/data/events.json');
-      if (!fs.existsSync(eventFile)) {
+      const seedCandidates = [
+        path.resolve(__dirname, 'data/events.json'),
+        path.resolve(__dirname, '../client/src/data/events.json'),
+        path.resolve(__dirname, '../data/events.json'),
+      ];
+
+      const eventFile = seedCandidates.find((candidate) => fs.existsSync(candidate));
+      if (!eventFile) {
+        console.warn('No event catalog JSON file found for DB seeding.');
         return;
       }
 
