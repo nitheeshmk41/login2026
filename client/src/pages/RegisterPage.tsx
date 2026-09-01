@@ -21,7 +21,7 @@ const participantSchema = z.object({
   department: z.string().min(1, 'PG Department is required'),
   roll_no: z.string().min(1, 'Roll / Reg No. is required'),
   gender: z.string().min(1, 'Please select your gender'),
-  year_of_study: z.string().optional(),
+  year_of_study: z.string().min(1, 'Please select your year of study'),
   accommodation_required: z.boolean().optional(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
@@ -37,8 +37,8 @@ const alumniSchema = z.object({
   phone: z.string().min(10, 'WhatsApp mobile number is required (min 10 digits)'),
   batch_year: z.string().min(1, 'Batch is required (e.g. 25MX)'),
   gender: z.string().min(1, 'Please select your gender'),
-  place: z.string().optional(),
-  current_organization: z.string().optional(),
+  place: z.string().min(2, 'City / Location is required'),
+  current_organization: z.string().min(2, 'Current organization is required'),
   accommodation_required: z.boolean().optional(),
 });
 
@@ -519,13 +519,15 @@ END:VCALENDAR`;
                   </div>
 
                   <div>
-                    <label className={labelClass}>City / Current Location</label>
+                    <label className={labelClass}>City / Current Location *</label>
                     <input type="text" {...register('place')} placeholder="e.g. Bengaluru / Coimbatore" className={inputClass} />
+                    {errors.place && <p className={errorClass}>{(errors.place as any).message}</p>}
                   </div>
 
                   <div>
-                    <label className={labelClass}>Current Organization</label>
+                    <label className={labelClass}>Current Organization *</label>
                     <input type="text" {...register('current_organization')} placeholder="Company / Startup" className={inputClass} />
+                    {errors.current_organization && <p className={errorClass}>{(errors.current_organization as any).message}</p>}
                   </div>
                 </div>
 
@@ -567,12 +569,14 @@ END:VCALENDAR`;
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Year of Study</label>
-                    <select {...register('year_of_study')} className={inputClass}>
+                    <label className={labelClass}>Year of Study *</label>
+                    <select {...register('year_of_study')} className={inputClass} defaultValue="">
+                      <option value="" disabled>Select year of study *</option>
                       <option value="1st Year">1st Year</option>
                       <option value="2nd Year">2nd Year</option>
                       <option value="3rd Year">3rd Year</option>
                     </select>
+                    {errors.year_of_study && <p className={errorClass}>{(errors.year_of_study as any).message}</p>}
                   </div>
                   <div className="flex items-end pb-1">
                     <label className="flex items-center gap-3 text-xs font-mono text-[#F7F2F2] cursor-pointer">

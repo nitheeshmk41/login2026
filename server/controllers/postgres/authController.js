@@ -232,19 +232,39 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Please select a gender." });
     }
 
-    if (finalPhone) {
-      const digitsOnly = finalPhone.replace(/[^0-9]/g, '');
-      if (digitsOnly.length < 10 || digitsOnly.length > 15 || !/^\+?[0-9\s()-]{10,18}$/.test(finalPhone)) {
-        await transaction.rollback();
-        return res.status(400).json({ message: "Please enter a valid mobile number with at least 10 digits." });
-      }
+    if (!finalPhone) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "WhatsApp mobile number is required." });
     }
 
-    if (isAlumni && batch_year && !/^\d{2,4}(MX)?$/i.test(String(batch_year).trim())) {
+    const digitsOnly = finalPhone.replace(/[^0-9]/g, '');
+    if (digitsOnly.length < 10 || digitsOnly.length > 15 || !/^\+?[0-9\s()-]{10,18}$/.test(finalPhone)) {
       await transaction.rollback();
-      return res.status(400).json({
-        message: "Please enter a valid batch (e.g. 25MX)",
-      });
+      return res.status(400).json({ message: "Please enter a valid mobile number with at least 10 digits." });
+    }
+
+    if (isAlumni) {
+      if (!batch_year || !String(batch_year).trim()) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Batch year is required (e.g. 25MX)." });
+      }
+      if (!/^\d{2,4}(MX)?$/i.test(String(batch_year).trim())) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Please enter a valid batch (e.g. 25MX)" });
+      }
+      if (!place || String(place).trim().length < 2) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "City / Location is required." });
+      }
+      if (!current_organization || String(current_organization).trim().length < 2) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Current organization is required." });
+      }
+    } else {
+      if (!year_of_study || !String(year_of_study).trim()) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Please select a year of study." });
+      }
     }
 
     if (!trimmedOtp || !/^\d{6}$/.test(trimmedOtp)) {
