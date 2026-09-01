@@ -35,7 +35,10 @@ const alumniSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   otp: z.string().optional(),
   phone: z.string().min(10, 'WhatsApp mobile number is required (min 10 digits)'),
-  batch_year: z.string().min(1, 'Batch is required (e.g. 25MX)'),
+  batch_year: z
+    .string()
+    .min(1, 'Batch is required (e.g. 25MX)')
+    .regex(/^\d{2}MX$/i, 'Batch must be 2 digits followed by MX (e.g. 25MX, 96MX)'),
   gender: z.string().min(1, 'Please select your gender'),
   place: z.string().min(2, 'City / Location is required'),
   current_organization: z.string().min(2, 'Current organization is required'),
@@ -523,7 +526,8 @@ END:VCALENDAR`;
                       type="text"
                       {...register('batch_year')}
                       placeholder="e.g. 25MX"
-                      className={inputClass}
+                      maxLength={4}
+                      className={`${inputClass} uppercase`}
                     />
                     {errors.batch_year && <p className={errorClass}>{(errors.batch_year as any).message}</p>}
                   </div>

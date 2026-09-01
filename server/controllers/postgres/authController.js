@@ -260,13 +260,10 @@ const registerUser = async (req, res) => {
     }
 
     if (isAlumni) {
-      if (!batch_year || !String(batch_year).trim()) {
+      const trimmedBatch = String(batch_year || "").trim();
+      if (!trimmedBatch || !/^\d{2}MX$/i.test(trimmedBatch)) {
         await transaction.rollback();
-        return res.status(400).json({ message: "Batch year is required (e.g. 25MX)." });
-      }
-      if (!/^\d{2,4}(MX)?$/i.test(String(batch_year).trim())) {
-        await transaction.rollback();
-        return res.status(400).json({ message: "Please enter a valid batch (e.g. 25MX)" });
+        return res.status(400).json({ message: "Batch must be exactly 2 digits followed by MX (e.g. 25MX, 96MX)." });
       }
       if (!place || String(place).trim().length < 2) {
         await transaction.rollback();
@@ -332,7 +329,7 @@ const registerUser = async (req, res) => {
         name,
         email: finalEmail,
         phone: finalPhone,
-        batch_year: String(batch_year || "").trim(),
+        batch_year: String(batch_year || "").trim().toUpperCase(),
         gender,
         place,
         current_organization,
