@@ -6,9 +6,17 @@ const serverEnvPath = path.resolve(__dirname, '.env');
 require('dotenv').config({ path: repoEnvPath });
 require('dotenv').config({ path: serverEnvPath });
 
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_login_2026';
-process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'super_secret_session_key_login_2026';
-process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'REPLACE_WITH_64_CHAR_RANDOM_HEX') {
+  console.error('FATAL: JWT_SECRET is not configured. Set a strong random secret in .env');
+  process.exit(1);
+}
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'REPLACE_WITH_64_CHAR_RANDOM_HEX') {
+  console.error('FATAL: SESSION_SECRET is not configured. Set a strong random secret in .env');
+  process.exit(1);
+}
+process.env.FRONTEND_URL = (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes("vercel.app")) 
+  ? process.env.FRONTEND_URL 
+  : "https://login.psgtech.ac.in";
 
 const fs = require("fs");
 const app = require("./app");
@@ -51,14 +59,15 @@ const startServer = async () => {
       await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'admin';");
       await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'coordinator';");
       await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'participant';");
+      await sequelize.query("ALTER TYPE \"enum_users_role\" ADD VALUE IF NOT EXISTS 'registration_desk';");
     } catch (enumErr) {
       console.warn("enum_users_role update warning:", enumErr.message);
     }
 
     try {
-      await sequelize.query("UPDATE users SET role = 'participant' WHERE role = 'student' OR role = 'alumni';");
-      await sequelize.query("UPDATE users SET role = 'coordinator' WHERE role IN ('event_coordinator', 'special_user', 'junior_attendance');");
-      await sequelize.query("UPDATE users SET role = 'admin' WHERE role IN ('admin', 'super_admin', 'admin_power');");
+      await sequelize.query("UPDATE users SET role = 'participant' WHERE role::text = 'student' OR role::text = 'alumni';");
+      await sequelize.query("UPDATE users SET role = 'coordinator' WHERE role::text IN ('event_coordinator', 'special_user', 'junior_attendance');");
+      await sequelize.query("UPDATE users SET role = 'admin' WHERE role::text IN ('admin', 'super_admin', 'admin_power');");
     } catch (roleUpdateErr) {
       console.warn('Legacy role normalization warning:', roleUpdateErr.message);
     }
@@ -165,10 +174,12 @@ const startServer = async () => {
     // --- SEED ACCOUNTS ---
     try {
       const { Op } = require('sequelize');
-   const seeds = [  { email: 'login@psgtech.ac.in', name: "login'26", login_id: 'login26admin', pass: 'Admin@login26', role: 'super_admin' },
-   { email: '25mx103@psgtech.ac.in', name: 'Barathvikraman S K', login_id: '25mx103', pass: 'Barath2606#', role: 'super_admin' },
-        { email: '25mx336@psgtech.ac.in', name: 'nitheeshmuthukrishnan', login_id: '25mx336', pass: 'Admin@login26', role: 'super_admin' }
-      ];
+   const seedPass = process.env.SEED_ADMIN_PASSWORD || 'ChangeMe!Rotate2026';
+   const seeds = [
+     { email: 'login@psgtech.ac.in', name: "login'26", login_id: 'login26admin', pass: seedPass, role: 'super_admin' },
+     { email: '25mx103@psgtech.ac.in', name: 'Barathvikraman S K', login_id: '25mx103', pass: seedPass, role: 'super_admin' },
+     { email: '25mx336@psgtech.ac.in', name: 'nitheeshmuthukrishnan', login_id: '25mx336', pass: seedPass, role: 'super_admin' }
+   ];
 
       // Remove old static seeds if they exist
       await userModel.destroy({ where: { login_id: { [Op.in]: ['ADMIN', 'COORD'] } } }).catch(() => {});

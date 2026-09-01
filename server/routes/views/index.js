@@ -22,25 +22,42 @@ router.get('/register', viewController.renderRegister);
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ where: { email } });
+    if (!email || !password) {
+      return res.redirect('/login?error=Email%20and%20password%20are%20required');
+    }
+
+    const user = await User.findOne({ where: { email: String(email).trim().toLowerCase() } });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.redirect('/login?error=Invalid%20email%20or%20password');
     }
 
+    if (!user.is_active) {
+      return res.redirect('/login?error=Account%20is%20inactive');
+    }
+
+    // Normalize role for consistent session checks
+    const normalizeRole = (role) => {
+      const map = { student: 'participant', event_coordinator: 'coordinator', special_user: 'coordinator', junior_attendance: 'coordinator', admin_power: 'admin', super_admin: 'admin' };
+      const normalized = String(role || '').trim().toLowerCase();
+      return map[normalized] || normalized || 'participant';
+    };
+
+    const normalizedRole = normalizeRole(user.role);
+
     req.session.user = {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      role: normalizedRole,
       user_type: user.user_type,
       student_id_code: user.student_id_code
     };
 
-    if (user.role === 'admin' || user.role === 'admin_power') {
+    if (normalizedRole === 'admin') {
       return res.redirect('/admin');
     }
-    if (user.role === 'event_coordinator') {
+    if (normalizedRole === 'coordinator') {
       return res.redirect('/coordinator');
     }
     return res.redirect('/dashboard');
@@ -50,44 +67,11 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, phone, password, college_name, user_type } = req.body;
-    const existing = await User.findOne({ where: { email } });
-
-    if (existing) {
-      return res.redirect('/register?error=Email%20already%20registered');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({
-      name,
-      email,
-      phone,
-      password: hashedPassword,
-      college_name: college_name || 'PSG College of Technology',
-      user_type: user_type || 'PARTICIPANT',
-      role: 'student'
-    });
-
-    req.session.user = {
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      user_type: newUser.user_type,
-      student_id_code: newUser.student_id_code
-    };
-
-    if (user_type === 'ALUMNI') {
-      return res.redirect('/alumni?msg=Registration%20Successful');
-    }
-
-    res.redirect('/dashboard');
-  } catch (err) {
-    console.error('Register POST error:', err);
-    res.redirect('/register?error=Registration%20failed');
-  }
+// MPA registration is disabled — redirect to SPA registration which has full
+// security controls (OTP verification, password strength, phone validation).
+router.post('/register', (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  return res.redirect(`${frontendUrl}/register`);
 });
 
 router.post('/logout', (req, res) => {
@@ -163,7 +147,7 @@ router.get('/coordinator', viewController.renderCoordinator);
 
 // Roster CSV Export Route
 router.get('/coordinator/export-csv', async (req, res) => {
-  if (!req.session.user || (req.session.user.role !== 'event_coordinator' && req.session.user.role !== 'admin')) {
+  if (!req.session.user || !['coordinator', 'admin'].includes(req.session.user.role)) {
     return res.status(403).send('Forbidden');
   }
 
@@ -215,7 +199,7 @@ router.get('/admin', viewController.renderAdmin);
 
 // Admin Event Venue & Timing Update Endpoint (Triggers Emails & Change Logs)
 router.post('/admin/events/:id/update', async (req, res) => {
-  if (!req.session.user || (req.session.user.role !== 'admin' && req.session.user.role !== 'admin_power')) {
+  if (!req.session.user || req.session.user.role !== 'admin') {
     return res.status(403).send('Forbidden');
   }
 
@@ -290,7 +274,7 @@ router.post('/admin/access', async (req, res) => {
         email,
         phone,
         password: hashedPassword,
-        role: role || 'event_coordinator',
+        role: role || 'coordinator',
         user_type: 'PARTICIPANT',
         must_change_password: true,
       }
@@ -314,7 +298,7 @@ router.post('/admin/access', async (req, res) => {
 });
 
 router.post('/admin/payments/:id/verify', async (req, res) => {
-  if (!req.session.user || (req.session.user.role !== 'admin' && req.session.user.role !== 'admin_power')) {
+  if (!req.session.user || req.session.user.role !== 'admin') {
     return res.status(403).send('Forbidden');
   }
 

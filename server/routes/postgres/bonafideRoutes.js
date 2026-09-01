@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const { verifyJwt } = require("../../middleware/auth");
 const allowRoles = require("../../middleware/allowRoles");
 const bonafideController = require("../../controllers/postgres/bonafideController");
@@ -22,7 +22,7 @@ router.post(
 router.put(
   "/:id/verify",
   verifyJwt,
-  allowRoles("admin", "event_coordinator"),
+  allowRoles("admin", "coordinator"),
   bonafideController.verifyBonafide
 );
 

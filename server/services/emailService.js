@@ -1,5 +1,13 @@
 const nodemailer = require("nodemailer");
-const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+
+const getFrontendUrl = () => {
+  const envUrl = (process.env.FRONTEND_URL || "").trim();
+  if (!envUrl || envUrl.includes("vercel.app")) {
+    return "https://login.psgtech.ac.in";
+  }
+  return envUrl.replace(/\/$/, "");
+};
+const frontendUrl = getFrontendUrl();
 
 const BRAND = {
   bg: '#0A0607',
@@ -60,40 +68,52 @@ const renderBrandTemplate = ({ title, subtitle, preview, body, ctaText, ctaLink 
   </div>
 `;
 
-const createTransporter = () => {
-  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+const createTransporter = ({ mailType = "general" } = {}) => {
+  const isOtp = String(mailType).toLowerCase() === "otp";
+  const host = process.env.SMTP_HOST;
+  const user = isOtp ? process.env.SMTP_OTP_USER : process.env.SMTP_USER;
+  const pass = isOtp ? process.env.SMTP_OTP_PASS : process.env.SMTP_PASS;
+
+  if (host && user && pass) {
     return nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host,
       port: process.env.SMTP_PORT || 587,
       secure: process.env.SMTP_SECURE === "true",
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user,
+        pass,
       },
     });
   }
+
   return null;
 };
 
-const sendEmail = async ({ to, subject, html, text }) => {
+const sendEmail = async ({ to, subject, html, text, mailType = "general", from } = {}) => {
   try {
-    const transporter = createTransporter();
-    const from = process.env.SMTP_FROM || `"LOGIN 2026 Admin" <login@psgtech.ac.in>`;
+    const transporter = createTransporter({ mailType });
+    const finalFrom = from || (
+      String(mailType).toLowerCase() === "otp"
+        ? (process.env.SMTP_OTP_FROM || `"LOGIN 2026 OTP" <caa@psgtech.ac.in>`)
+        : (process.env.SMTP_FROM || `"LOGIN 2026" <login@psgtech.ac.in>`)
+    );
 
     if (transporter) {
       const info = await transporter.sendMail({
-        from,
+        from: finalFrom,
         to,
         subject,
         html,
         text: text || html.replace(/<[^>]*>?/gm, ""),
       });
-      console.log(`[Email Sent from login@psgtech.ac.in] To: ${to} | Subject: ${subject} | ID: ${info.messageId}`);
+      const senderLabel = String(mailType).toLowerCase() === "otp" ? (process.env.SMTP_OTP_USER || 'otp') : (process.env.SMTP_USER || 'login');
+      console.log(`[Email Sent from ${senderLabel}] To: ${to} | Subject: ${subject} | ID: ${info.messageId}`);
       return info;
     }
 
-    console.log(`[Email Logged (Sender: login@psgtech.ac.in)] To: ${to} | Subject: ${subject}`);
-    return { mock: true, from: 'login@psgtech.ac.in' };
+    const mockSender = String(mailType).toLowerCase() === "otp" ? (process.env.SMTP_OTP_FROM || 'caa@psgtech.ac.in') : (process.env.SMTP_FROM || 'login@psgtech.ac.in');
+    console.log(`[Email Logged (Sender: ${mockSender})] To: ${to} | Subject: ${subject}`);
+    return { mock: true, from: mockSender };
   } catch (error) {
     console.error(`[Email Error] To: ${to} | Error:`, error.message);
     return { error: error.message };
@@ -121,7 +141,7 @@ const sendOtpEmail = async (to, otp, expiryMinutes = 10) => {
     `,
   });
 
-  return sendEmail({ to, subject, html });
+  return sendEmail({ to, subject, html, mailType: "otp" });
 };
 
 const sendWelcomeEmail = async ({ to, name, loginId, password, loginUrl = `${frontendUrl}/login` }) => {
@@ -261,53 +281,8 @@ const sendPaymentVerifiedEmail = async ({ to, name, studentIdCode, portalUrl = `
 };
 
 const sendEventRegistrationConfirmation = async (user, event, team = null) => {
-  const paymentModel = require("../models/postgres/paymentModel");
-  let isVerified = false;
-
-  try {
-    const payment = await paymentModel.findOne({ where: { student_id: user.id } });
-    if (payment && payment.status === 'VERIFIED') {
-      isVerified = true;
-    }
-  } catch (err) {
-    // fallback
-  }
-
-  const subject = `[LOGIN 2026] ${isVerified ? 'Registration Confirmed' : 'Registration Received - Payment Pending'}: ${event.name}`;
-  const html = renderBrandTemplate({
-    title: isVerified ? 'REGISTRATION CONFIRMED' : 'REGISTRATION RECEIVED',
-    subtitle: isVerified ? 'Your participation is active and verified.' : 'Payment verification is pending for your slot.',
-    preview: isVerified ? 'CONFIRMED' : 'PAYMENT PENDING',
-    body: `
-      <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
-        Hello <strong style="color:${BRAND.text};">${escapeHtml(user.name)}</strong>,
-      </p>
-      <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:${BRAND.muted};">
-        Your registration for <strong style="color:${BRAND.text};">${escapeHtml(event.name)}</strong> has been recorded successfully in the LOGIN 2K26 system.
-      </p>
-      <div style="background:${isVerified ? 'rgba(31,169,113,0.12)' : 'rgba(224,27,34,0.12)'};border:1px solid ${isVerified ? BRAND.green : BRAND.red};padding:18px;border-radius:6px;margin-bottom:18px;">
-        <div style="font-size:11px;letter-spacing:2px;color:${BRAND.gold};text-transform:uppercase;font-family:monospace;">Status</div>
-        <p style="margin:10px 0 0; font-size:14px; color:${BRAND.text};line-height:1.7;">
-          ${isVerified
-            ? `Verified: Your participation is now active and ready for event access.`
-            : `Pending verification: Please submit your UTR reference in the dashboard so the committee can validate your payment.`}
-        </p>
-      </div>
-      <div style="background:${BRAND.panel};border:1px solid ${BRAND.border};padding:18px;border-radius:6px;">
-        <div style="color:${BRAND.muted};font-size:12px;line-height:1.8;">
-          <div>Participant ID: <strong style="color:${BRAND.text};">${escapeHtml(user.student_id_code || 'Pending Verification')}</strong></div>
-          <div>Category: <strong style="color:${BRAND.text};">${escapeHtml(event.category === 'TECHNICAL' ? 'Technical Arena' : 'Non-Technical Arena')}</strong></div>
-          <div>Day: <strong style="color:${BRAND.text};">Day ${event.day} (18–19 September 2026)</strong></div>
-          <div>Venue: <strong style="color:${BRAND.text};">${escapeHtml(event.venue || 'Dept. of Computer Applications, PSG Tech')}</strong></div>
-          ${team ? `<div>Team: <strong style="color:${BRAND.gold};">${escapeHtml(team.name)}</strong></div>` : ''}
-        </div>
-      </div>
-    `,
-    ctaText: isVerified ? 'VIEW DASHBOARD' : 'SUBMIT PAYMENT',
-    ctaLink: `${frontendUrl}/dashboard`,
-  });
-
-  return sendEmail({ to: user.email, subject, html });
+  // Disabled as per system policy: Event registration emails are disabled. Only OTP, Payment Verified, Forgot Password, and Registration Greeting emails are enabled.
+  return Promise.resolve(false);
 };
 
 const sendEventChangeNotification = async (user, event, changes) => {

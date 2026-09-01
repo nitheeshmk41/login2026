@@ -346,7 +346,7 @@ module.exports = {
 
   // 12. Coordinator Desk (PAPER Stock)
   renderCoordinator: async (req, res) => {
-    if (!req.session.user || (req.session.user.role !== 'event_coordinator' && req.session.user.role !== 'admin' && req.session.user.role !== 'admin_power')) {
+    if (!req.session.user || !['coordinator', 'admin'].includes(req.session.user.role)) {
       return res.status(403).send('403 Forbidden: Coordinator Desk Only');
     }
 
@@ -386,7 +386,7 @@ module.exports = {
 
   // 13. Admin Control Surface (PAPER Stock)
   renderAdmin: async (req, res) => {
-    if (!req.session.user || (req.session.user.role !== 'admin' && req.session.user.role !== 'admin_power')) {
+    if (!req.session.user || req.session.user.role !== 'admin') {
       return res.status(403).send('403 Forbidden: Admin Panel Only');
     }
 

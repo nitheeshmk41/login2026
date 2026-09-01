@@ -27,5 +27,6 @@ router.put("/join-requests/:id", verifyJwt, allowRoles("participant"), teamContr
 // Team Registration & Member Management
 router.post("/:teamId/register", verifyJwt, allowRoles("participant"), teamController.registerTeamForEvent);
 router.delete("/:teamId/members/:userId", verifyJwt, allowRoles("participant"), teamController.removeMember);
+router.delete("/:teamId", verifyJwt, allowRoles("participant"), teamController.deleteTeam);
 
 module.exports = router;

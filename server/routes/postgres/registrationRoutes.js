@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const { verifyJwt } = require("../../middleware/auth");
 const allowRoles = require("../../middleware/allowRoles");
 const verifyEventCoordinatorAccess = require("../../middleware/eventCoordinatorAccess");
@@ -30,6 +30,20 @@ router.get(
 
 router.put(
   "/:id/cancel",
+  verifyJwt,
+  allowRoles("participant"),
+  registrationController.cancelRegistration
+);
+
+router.delete(
+  "/event/:eventId",
+  verifyJwt,
+  allowRoles("participant"),
+  registrationController.deregisterByEventId
+);
+
+router.delete(
+  "/:id",
   verifyJwt,
   allowRoles("participant"),
   registrationController.cancelRegistration

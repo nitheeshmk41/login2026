@@ -20,7 +20,6 @@ const allowedOrigins = new Set([
   "https://www.login.psgtech.ac.in",
   "http://login.psgtech.ac.in",
   "http://www.login.psgtech.ac.in",
-  "https://login2026-client.vercel.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://frontend:5173",
@@ -31,11 +30,17 @@ const isAllowedOrigin = (origin) => {
 
   if (allowedOrigins.has(origin)) return true;
 
-  return (
-    origin.includes("login.psgtech.ac.in") ||
-    origin.includes("login2026-client") &&
-    (origin.includes(".vercel.app") || origin.includes("localhost"))
-  );
+  // Strict domain check: allow psgtech.ac.in subdomains
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (hostname === 'login.psgtech.ac.in' || hostname === 'www.login.psgtech.ac.in' || hostname.endsWith('.psgtech.ac.in')) return true;
+  } catch (_) {
+    // Invalid URL — reject
+  }
+
+  return false;
 };
 
 const isProductionRequest =
@@ -61,9 +66,21 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (isProductionRequest) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // Express Session setup for MPA Cookie Auth
 app.use(
@@ -93,7 +110,22 @@ app.use("/uploads", express.static(publicUploadsDir));
 // MPA View Routes (Server-rendered HTML)
 app.use("/", require("./routes/views/index"));
 
-app.post("/api/contact", async (req, res) => {
+const { contactLimiter } = require("./middleware/rateLimiter");
+
+/**
+ * Escape HTML special characters for safe email embedding.
+ */
+const escapeHtml = (str) => {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+app.post("/api/contact", contactLimiter, async (req, res) => {
   try {
     const { name, email, message } = req.body || {};
     const trimmedName = String(name || "").trim();
@@ -112,6 +144,11 @@ app.post("/api/contact", async (req, res) => {
       return res.status(400).json({ message: "Your message must be at least 12 characters long." });
     }
 
+    // Sanitize user input for email HTML to prevent XSS
+    const safeName = escapeHtml(trimmedName);
+    const safeEmail = escapeHtml(trimmedEmail);
+    const safeMessage = escapeHtml(trimmedMessage);
+
     const html = `
       <div style="font-family:Segoe UI,Arial,sans-serif; background:#0A0607; color:#F7F2F2; padding:28px; border:1px solid #2A1A1D; max-width:640px; margin:0 auto;">
         <div style="background:linear-gradient(135deg,#E01B22 0%,#26080C 100%); padding:20px 24px; margin-bottom:20px; border-radius:8px;">
@@ -119,17 +156,17 @@ app.post("/api/contact", async (req, res) => {
           <div style="font-size:11px; letter-spacing:2px; opacity:0.8; margin-top:8px;">CONTACT FORM MESSAGE</div>
         </div>
         <div style="line-height:1.8; font-size:15px; color:#F7F2F2;">
-          <p><strong>Name:</strong> ${trimmedName}</p>
-          <p><strong>Email:</strong> ${trimmedEmail}</p>
+          <p><strong>Name:</strong> ${safeName}</p>
+          <p><strong>Email:</strong> ${safeEmail}</p>
           <p><strong>Message:</strong></p>
-          <p style="white-space:pre-wrap; color:#A79798;">${trimmedMessage.replace(/\n/g, '<br/>')}</p>
+          <p style="white-space:pre-wrap; color:#A79798;">${safeMessage.replace(/\n/g, '<br/>')}</p>
         </div>
       </div>
     `;
 
     await sendEmail({
       to: "login@psgtech.ac.in",
-      subject: `[LOGIN 2K26] Contact form message from ${trimmedName}`,
+      subject: `[LOGIN 2K26] Contact form message from ${safeName}`,
       html,
       text: `Name: ${trimmedName}\nEmail: ${trimmedEmail}\nMessage: ${trimmedMessage}`,
     });

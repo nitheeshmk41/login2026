@@ -47,18 +47,42 @@ const upload = multer({
   fileFilter: fileFilter,
 });
 
-router.post("/receipt", verifyJwt, upload.single("receipt"), (req, res) => {
+const sharp = require("sharp");
+
+router.post("/receipt", verifyJwt, upload.single("receipt"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "No file uploaded or invalid file format" });
   }
   
-  // The static route serves public/uploads as /uploads
-  const fileUrl = `/uploads/receipts/${req.file.filename}`;
-  
-  res.status(200).json({
-    message: "File uploaded successfully",
-    url: fileUrl,
-  });
+  try {
+    let fileUrl = "";
+
+    // If it's a PDF, we might not want to process with sharp, but the user said "add image processing"
+    // We can just base64 encode PDF directly, and use Sharp for images.
+    if (req.file.mimetype === "application/pdf") {
+      const fileData = fs.readFileSync(req.file.path);
+      fileUrl = `data:application/pdf;base64,${fileData.toString("base64")}`;
+    } else {
+      const processedBuffer = await sharp(req.file.path)
+        .resize(800, null, { withoutEnlargement: true })
+        .webp({ quality: 70 })
+        .toBuffer();
+      fileUrl = `data:image/webp;base64,${processedBuffer.toString("base64")}`;
+    }
+
+    // Optionally delete the temporary file
+    fs.unlink(req.file.path, (err) => {
+      if (err) console.error("Failed to delete temp file:", err);
+    });
+
+    res.status(200).json({
+      message: "File uploaded successfully",
+      url: fileUrl,
+    });
+  } catch (error) {
+    console.error("Processing error:", error);
+    res.status(500).json({ message: "Failed to process receipt" });
+  }
 });
 
 const bonafideDir = path.join(baseUploadDir, "bonafides");

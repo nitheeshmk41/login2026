@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-const jwtSecret = process.env.JWT_SECRET || "super_secret_jwt_key_login_2026";
+const jwtSecret = process.env.JWT_SECRET;
 
 const verifyJwt = (req, res, next) => {
   try {

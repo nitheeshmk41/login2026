@@ -8,14 +8,14 @@ const router = express.Router();
 router.get(
   "/event/:eventId/students",
   verifyJwt,
-  allowRoles("event_coordinator", "admin"),
+  allowRoles("coordinator", "admin"),
   exportController.exportEventStudents
 );
 
 router.get(
   "/attendance",
   verifyJwt,
-  allowRoles("junior_attendance", "admin"),
+  allowRoles("coordinator", "admin"),
   exportController.exportAttendance
 );
 

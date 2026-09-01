@@ -68,7 +68,7 @@ const paymentModel = sequelize.define(
     },
 
     receipt_url: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
 

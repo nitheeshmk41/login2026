@@ -70,4 +70,7 @@ router.put(
   paymentController.initiateRefund
 );
 
+// ── View Receipt (requires authentication) ─────────
+router.get('/receipt/:id', verifyJwt, paymentController.viewReceipt);
+
 module.exports = router;

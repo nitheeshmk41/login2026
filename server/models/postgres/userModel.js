@@ -53,7 +53,8 @@ const userModel = sequelize.define(
       type: DataTypes.ENUM(
         "admin",
         "coordinator",
-        "participant"
+        "participant",
+        "registration_desk"
       ),
       allowNull: false,
       defaultValue: "participant",

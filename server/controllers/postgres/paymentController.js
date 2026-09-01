@@ -337,3 +337,30 @@ module.exports = {
   bulkVerify,
 };
 
+
+const viewReceipt = async (req, res) => {
+  try {
+    const payment = await paymentModel.findByPk(req.params.id);
+    if (!payment || !payment.receipt_url) {
+      return res.status(404).send("Receipt not found");
+    }
+
+    const dataUrl = payment.receipt_url;
+    if (dataUrl.startsWith("data:")) {
+      const parts = dataUrl.split(";base64,");
+      const contentType = parts[0].split(":")[1];
+      const base64Data = parts[1];
+      
+      const buffer = Buffer.from(base64Data, "base64");
+      res.setHeader("Content-Type", contentType);
+      return res.send(buffer);
+    } else {
+      // If it's a regular path (legacy), redirect to it
+      return res.redirect(dataUrl);
+    }
+  } catch (error) {
+    return res.status(500).send("Error fetching receipt");
+  }
+};
+
+module.exports.viewReceipt = viewReceipt;

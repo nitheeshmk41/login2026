@@ -11,7 +11,7 @@ router.get("/", resultController.getAllResults);
 router.get(
   "/event/:eventId",
   verifyJwt,
-  allowRoles("event_coordinator", "admin"),
+  allowRoles("coordinator", "admin"),
   verifyEventCoordinatorAccess,
   resultController.getEventResult
 );
@@ -19,7 +19,7 @@ router.get(
 router.put(
   "/event/:eventId",
   verifyJwt,
-  allowRoles("event_coordinator", "admin"),
+  allowRoles("coordinator", "admin"),
   verifyEventCoordinatorAccess,
   resultController.saveEventResult
 );

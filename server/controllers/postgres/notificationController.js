@@ -16,13 +16,14 @@ const getMyNotifications = async (req, res) => {
 
 const getUnreadCount = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) return res.json({ count: 0 });
     const count = await notificationModel.count({
       where: { user_id: req.user.id, is_read: false },
     });
 
-    return res.json({ count });
+    return res.json({ count: count || 0 });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch unread count", error: error.message });
+    return res.json({ count: 0 });
   }
 };
 
@@ -59,10 +60,20 @@ const markAllAsRead = async (req, res) => {
 
 const createNotification = async (req, res) => {
   try {
-    const notification = await notificationModel.create(req.body);
+    const { user_id, title, message, type } = req.body;
+    if (!user_id || !title || !message) {
+      return res.status(400).json({ message: "user_id, title, and message are required" });
+    }
+
+    const notification = await notificationModel.create({
+      user_id,
+      title: String(title).slice(0, 255),
+      message: String(message).slice(0, 1000),
+      type: type || "info",
+    });
     return res.status(201).json({ message: "Notification created", notification });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to create notification", error: error.message });
+    return res.status(500).json({ message: "Failed to create notification" });
   }
 };
 

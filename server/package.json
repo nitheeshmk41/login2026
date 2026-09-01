@@ -19,6 +19,7 @@
     "ejs": "^6.0.1",
     "express": "^5.2.1",
     "express-ejs-layouts": "^2.5.1",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
     "login-2k26-client": "file:../client",
@@ -26,6 +27,7 @@
     "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
     "sequelize": "^6.37.8",
+    "sharp": "^0.35.4",
     "sqlite3": "^6.0.1",
     "xlsx": "^0.18.5"
   }
