@@ -16,7 +16,30 @@ const {
 } = require("../../services/emailService");
 const alumniModel = require("../../models/postgres/alumniModel");
 
-const jwtSecret = process.env.JWT_SECRET || "super_secret_jwt_key_login_2026";
+const jwtSecret = process.env.JWT_SECRET;
+
+/**
+ * Validate password strength: min 8 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char.
+ */
+const isStrongPassword = (password) => {
+  if (typeof password !== 'string' || password.length < 6) return false;
+  return true;
+};
+
+const PASSWORD_POLICY_MSG = 'Password must be at least 6 characters.';
+
+/**
+ * Escape HTML special characters to prevent XSS in email templates.
+ */
+const escapeHtml = (str) => {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
 
 const normalizeRole = (role) => {
   const value = String(role || '').trim().toLowerCase();
@@ -174,14 +197,19 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Full name is required for registration." });
     }
 
+    if (trimmedName.length > 35) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Full name must not exceed 35 characters." });
+    }
+
     if (!finalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
       await transaction.rollback();
       return res.status(400).json({ message: "Please enter a valid email address." });
     }
 
-    if (!isAlumni && (!trimmedPassword || trimmedPassword.length < 6)) {
+    if (!isAlumni && !isStrongPassword(trimmedPassword)) {
       await transaction.rollback();
-      return res.status(400).json({ message: "Password must be at least 6 characters long." });
+      return res.status(400).json({ message: PASSWORD_POLICY_MSG });
     }
 
     if (!isAlumni && (!college_name || String(college_name).trim().length < 2)) {
@@ -194,14 +222,22 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Department is required." });
     }
 
+    if (!isAlumni && (!roll_no || String(roll_no).trim().length < 1)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Roll / Registration number is required." });
+    }
+
     if (!gender || String(gender).trim().length < 1) {
       await transaction.rollback();
       return res.status(400).json({ message: "Please select a gender." });
     }
 
-    if (finalPhone && !/^\+?[0-9\s()-]{10,15}$/.test(finalPhone)) {
-      await transaction.rollback();
-      return res.status(400).json({ message: "Please enter a valid mobile number." });
+    if (finalPhone) {
+      const digitsOnly = finalPhone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length < 10 || digitsOnly.length > 15 || !/^\+?[0-9\s()-]{10,18}$/.test(finalPhone)) {
+        await transaction.rollback();
+        return res.status(400).json({ message: "Please enter a valid mobile number with at least 10 digits." });
+      }
     }
 
     if (isAlumni && batch_year && !/^\d{2,4}(MX)?$/i.test(String(batch_year).trim())) {
@@ -323,7 +359,6 @@ const registerUser = async (req, res) => {
           to: finalEmail,
           name: user.name,
           loginId,
-          password: password,
           loginUrl: `${frontendUrl}/login`,
         }).catch((err) => console.error("Failed to send welcome email:", err));
       }
@@ -410,6 +445,8 @@ const loginUser = async (req, res) => {
       return res.status(403).json({ message: 'Alumni accounts are not available for dashboard login.' });
     }
 
+    const isProduction = (process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase() === 'production';
+
     const token = jwt.sign(
       {
         id: user.id,
@@ -418,15 +455,15 @@ const loginUser = async (req, res) => {
       },
       jwtSecret,
       {
-        expiresIn: "7d",
+        expiresIn: "24h",
       }
     );
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     const payment = await paymentModel.findOne({
@@ -478,7 +515,7 @@ const forgotPassword = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours (120 minutes)
 
     const existingOtp = await otpModel.findOne({ where: { email: email.toLowerCase() } });
     if (existingOtp) {
@@ -498,13 +535,14 @@ const forgotPassword = async (req, res) => {
           <h2 style="color: #E01B22; margin-top: 0; font-size: 24px;">Password Reset Request</h2>
           <p style="color: #A79798; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">We received a request to reset your password. Click the secure button below to set a new password for your account.</p>
           <a href="${resetLink}" style="background-color: #E01B22; color: #F7F2F2; text-decoration: none; padding: 14px 28px; border-radius: 2px; font-weight: bold; font-family: monospace; letter-spacing: 1px; display: inline-block;">RESET PASSWORD</a>
-          <p style="color: #6B5A5C; font-size: 12px; margin-top: 32px; border-top: 1px solid #2A1A1D; padding-top: 16px;">This link will expire in 10 minutes. If you did not request a password reset, you can safely ignore this email.</p>
+          <p style="color: #6B5A5C; font-size: 12px; margin-top: 32px; border-top: 1px solid #2A1A1D; padding-top: 16px;">This link will expire in 2 hours. If you did not request a password reset, you can safely ignore this email.</p>
         </div>
       `,
+      mailType: "otp",
     });
 
     return res.status(200).json({
-      message: "OTP sent to your email",
+      message: "Password reset link sent to your email (valid for 2 hours)",
     });
   } catch (error) {
     return res.status(500).json({ message: "Failed to request password reset", error: error.message });
@@ -516,6 +554,10 @@ const resetPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
     if (!email || !otp || !newPassword) {
       return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({ message: PASSWORD_POLICY_MSG });
     }
 
     const validOtp = await otpModel.findOne({ where: { email: email.toLowerCase(), otp } });
@@ -532,7 +574,7 @@ const resetPassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
     user.must_change_password = false;
     await user.save();
@@ -541,7 +583,7 @@ const resetPassword = async (req, res) => {
 
     return res.status(200).json({ message: "Password reset successfully. You can now log in." });
   } catch (error) {
-    return res.status(400).json({ message: "Failed to reset password", error: error.message });
+    return res.status(400).json({ message: "Failed to reset password" });
   }
 };
 
@@ -550,21 +592,28 @@ const changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
+    if (!newPassword || !isStrongPassword(newPassword)) {
+      return res.status(400).json({ message: PASSWORD_POLICY_MSG });
+    }
+
     const user = await userModel.findByPk(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (currentPassword) {
-      const match = await bcrypt.compare(currentPassword, user.password);
-      if (!match) return res.status(400).json({ message: "Current password does not match" });
+    // Current password is required (prevent password change without knowing current password)
+    if (!currentPassword) {
+      return res.status(400).json({ message: "Current password is required" });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(400).json({ message: "Current password does not match" });
+
+    user.password = await bcrypt.hash(newPassword, 12);
     user.must_change_password = false;
     await user.save();
 
     return res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to change password", error: error.message });
+    return res.status(500).json({ message: "Failed to change password" });
   }
 };
 

@@ -4,22 +4,22 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { api } from '../services/api';
-import { ArrowRight, ShieldCheck, AlertCircle, Eye, EyeOff, Copy, Check, Calendar as CalendarIcon, Sparkles, Lock, Download } from 'lucide-react';
+import { ArrowRight, ShieldCheck, ShieldAlert, AlertCircle, Eye, EyeOff, Copy, Check, Calendar as CalendarIcon, Sparkles, Lock, Download } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { COLLEGES } from '../constants/colleges';
 import { PG_DEPARTMENTS } from '../constants/departments';
+import { CollegeCombobox } from '../components/common/CollegeCombobox';
 
 // ──────────────────────────────────────────────
 // Zod Validation Schemas
 // ──────────────────────────────────────────────
 const participantSchema = z.object({
-  name: z.string().min(2, 'Full name must be at least 2 characters'),
+  name: z.string().min(2, 'Full name must be at least 2 characters').max(35, 'Full name must be maximum 35 characters'),
   email: z.string().email('Invalid email address'),
-  otp: z.string().min(6, 'OTP must be 6 digits'),
+  otp: z.string().optional(),
   phone: z.string().min(10, 'WhatsApp mobile number is required (min 10 digits)'),
   college_name: z.string().min(2, 'College name is required'),
-  department: z.string().optional(),
-  roll_no: z.string().optional(),
+  department: z.string().min(1, 'PG Department is required'),
+  roll_no: z.string().min(1, 'Roll / Reg No. is required'),
   gender: z.string().min(1, 'Please select your gender'),
   year_of_study: z.string().optional(),
   accommodation_required: z.boolean().optional(),
@@ -31,9 +31,9 @@ const participantSchema = z.object({
 });
 
 const alumniSchema = z.object({
-  name: z.string().min(2, 'Full name is required'),
+  name: z.string().min(2, 'Full name is required').max(35, 'Full name must be maximum 35 characters'),
   email: z.string().email('Please enter a valid email address'),
-  otp: z.string().min(6, 'OTP must be 6 digits'),
+  otp: z.string().optional(),
   phone: z.string().min(10, 'WhatsApp mobile number is required (min 10 digits)'),
   batch_year: z.string().min(1, 'Batch is required (e.g. 25MX)'),
   gender: z.string().min(1, 'Please select your gender'),
@@ -116,10 +116,14 @@ export const RegisterPage: React.FC = () => {
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
-  const [otpMessage, setOtpMessage] = useState<string | null>(null);
+  
+  // OTP Modal State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [pendingData, setPendingData] = useState<any>(null);
+  const [otpValue, setOtpValue] = useState('');
 
   const handleSendOtp = async () => {
-    const email = (activeForm.getValues() as any).email as string;
+    const email = pendingData?.email || (activeForm.getValues() as any).email as string;
     if (!email || !email.includes('@')) {
       setError('email', { type: 'manual', message: 'Enter a valid email first' });
       return;
@@ -128,10 +132,8 @@ export const RegisterPage: React.FC = () => {
 
     try {
       setSendingOtp(true);
-      setOtpMessage(null);
       await api.auth.sendOtp(email);
       setOtpSent(true);
-      setOtpMessage('OTP sent successfully. Please check your inbox/spam.');
     } catch (err: any) {
       setServerError(err.response?.data?.message || 'Failed to send OTP');
     } finally {
@@ -146,18 +148,24 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
+    setPendingData(data);
+    
     if (!otpSent) {
       try {
         await handleSendOtp();
         setServerError(null);
-        setOtpMessage('OTP sent successfully. Enter the code and submit to complete registration.');
+        setShowOtpModal(true);
       } catch (err: any) {
         setServerError(err.response?.data?.message || 'Failed to send OTP');
       }
-      return;
+    } else {
+      setShowOtpModal(true);
     }
+  };
 
-    if (!data.otp || !/^\d{6}$/.test(String(data.otp).trim())) {
+  const handleVerifyAndRegister = async () => {
+    setServerError(null);
+    if (!otpValue || !/^\d{6}$/.test(String(otpValue).trim())) {
       setServerError('A valid 6-digit OTP is required before onboarding the participant.');
       return;
     }
@@ -165,15 +173,18 @@ export const RegisterPage: React.FC = () => {
     try {
       setLoading(true);
       const res = await api.auth.register({
-        ...data,
+        ...pendingData,
+        otp: otpValue,
         user_type: userType,
       });
 
+      setShowOtpModal(false);
+
       if (userType === 'ALUMNI') {
         setAlumniSuccessData({
-          name: data.name,
-          email: data.email,
-          batch_year: data.batch_year,
+          name: pendingData.name,
+          email: pendingData.email,
+          batch_year: pendingData.batch_year,
         });
 
         // Trigger celebratory confetti
@@ -186,7 +197,7 @@ export const RegisterPage: React.FC = () => {
       } else {
         setSuccessData({
           loginId: res.data.loginId,
-          password: data.password
+          password: pendingData.password
         });
       }
     } catch (err: any) {
@@ -462,50 +473,25 @@ END:VCALENDAR`;
               </div>
             </div>
 
-            {/* Email, OTP & Phone */}
+            {/* Email & Phone */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="col-span-1 sm:col-span-2">
+              <div className="col-span-1">
                 <label className={labelClass}>Email Address *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    {...register('email')}
-                    onBlur={(e) => {
-                      register('email').onBlur(e);
-                      handleEmailBlur(e);
-                    }}
-                    placeholder="you@college.edu"
-                    className={`${inputClass} flex-1 ${emailExistsError ? 'border-[#E01B22] text-[#FF2A2A]' : ''}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    disabled={sendingOtp || !!emailExistsError}
-                    className="px-3 sm:px-6 py-2.5 bg-[#1A0306] border border-[#E01B22] hover:bg-[#E01B22] text-[#F7F2F2] font-mono font-bold text-[10px] sm:text-xs uppercase rounded-[2px] transition-colors disabled:opacity-50 shrink-0"
-                  >
-                    {sendingOtp ? 'SENDING...' : otpSent ? 'RESEND OTP' : 'SEND OTP'}
-                  </button>
-                </div>
+                <input
+                  type="email"
+                  {...register('email')}
+                  onBlur={(e) => {
+                    register('email').onBlur(e);
+                    handleEmailBlur(e);
+                  }}
+                  placeholder="you@college.edu"
+                  className={`${inputClass} w-full ${emailExistsError ? 'border-[#E01B22] text-[#FF2A2A]' : ''}`}
+                />
                 {checkingEmail && <p className="text-[10px] font-mono text-[#E08A17] mt-1 animate-pulse">Verifying email in database...</p>}
                 {(errors.email || emailExistsError) && <p className={errorClass}>{emailExistsError || (errors.email as any).message}</p>}
-                {otpMessage && <p className="text-[10px] font-mono text-[#1FA971] mt-1">{otpMessage}</p>}
               </div>
 
-              {otpSent && (
-                <div className="animate-fade-in">
-                  <label className={labelClass}>Enter OTP *</label>
-                  <input
-                    type="text"
-                    {...register('otp')}
-                    placeholder="6-digit code"
-                    className={inputClass}
-                    maxLength={6}
-                  />
-                  {errors.otp && <p className={errorClass}>{(errors.otp as any).message}</p>}
-                </div>
-              )}
-
-              <div className={otpSent ? "" : "sm:col-span-2"}>
+              <div className="col-span-1">
                 <label className={labelClass}>WhatsApp Mobile Number *</label>
                 <input
                   type="text"
@@ -556,22 +542,26 @@ END:VCALENDAR`;
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className={labelClass}>College / Institution *</label>
-                    <input list="colleges-list" type="text" {...register('college_name')} placeholder="Search or type college..." className={inputClass} />
-                    <datalist id="colleges-list">
-                      {COLLEGES.map((c) => <option key={c} value={c} />)}
-                    </datalist>
-                    {errors.college_name && <p className={errorClass}>{(errors.college_name as any).message}</p>}
+                    <CollegeCombobox
+                      value={participantForm.watch('college_name') || ''}
+                      onChange={(val) => {
+                        participantForm.setValue('college_name', val, { shouldValidate: true });
+                      }}
+                      error={(errors.college_name as any)?.message}
+                    />
                   </div>
                   <div>
-                    <label className={labelClass}>PG Department / Stream</label>
+                    <label className={labelClass}>PG Department / Stream *</label>
                     <select {...register('department')} className={inputClass}>
-                      <option value="">Select PG Department (Optional)</option>
+                      <option value="">Select PG Department *</option>
                       {PG_DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
+                    {errors.department && <p className={errorClass}>{(errors.department as any).message}</p>}
                   </div>
                   <div>
-                    <label className={labelClass}>Roll / Reg No. (Optional)</label>
+                    <label className={labelClass}>Roll / Reg No. *</label>
                     <input type="text" {...register('roll_no')} placeholder="e.g. 24MX101" className={inputClass} />
+                    {errors.roll_no && <p className={errorClass}>{(errors.roll_no as any).message}</p>}
                   </div>
                 </div>
 
@@ -650,6 +640,70 @@ END:VCALENDAR`;
           </div>
         </div>
       </div>
+      
+      {/* OTP Verification Modal */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 bg-[#0A0607]/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#130C0E] border border-[#E01B22] w-full max-w-md p-6 rounded-[2px] shadow-2xl relative">
+            <h3 className="font-display font-bold text-lg text-[#F7F2F2] mb-2 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-[#E08A17]" /> VERIFY YOUR EMAIL
+            </h3>
+            <p className="text-xs font-mono text-[#A79798] mb-6 leading-relaxed">
+              An OTP has been sent to <strong className="text-[#F7F2F2] select-all">{pendingData?.email}</strong>.{' '}
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowOtpModal(false);
+                  setServerError(null);
+                }}
+                className="text-[#E01B22] hover:text-[#FF2A2A] hover:underline font-bold inline-block"
+                title="Edit email address"
+              >
+                (Wrong Email? Edit)
+              </button>
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-[#A79798] tracking-[0.15em] mb-1.5 uppercase font-mono">
+                  ENTER 6-DIGIT OTP
+                </label>
+                <input
+                  type="text"
+                  value={otpValue}
+                  onChange={(e) => setOtpValue(e.target.value)}
+                  placeholder="------"
+                  maxLength={6}
+                  className="w-full bg-[#0A0607] border border-[#2A1A1D] text-[#F7F2F2] p-3 rounded-[2px] outline-none font-mono text-center tracking-[0.5em] text-lg focus:border-[#E01B22] transition-colors"
+                />
+              </div>
+
+              {serverError && (
+                <div className="p-3 bg-[#E01B22]/10 border border-[#E01B22]/30 text-[#FF2A2A] text-xs font-mono rounded-[2px]">
+                  {serverError}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3 pt-2">
+                <button
+                  onClick={handleVerifyAndRegister}
+                  disabled={loading || otpValue.length !== 6}
+                  className="w-full py-3 bg-[#1FA971] hover:bg-[#158f5c] text-[#0A0607] font-bold font-mono text-sm uppercase rounded-[2px] transition-all disabled:opacity-50"
+                >
+                  {loading ? 'VERIFYING...' : 'VERIFY & REGISTER'}
+                </button>
+                <button
+                  onClick={handleSendOtp}
+                  disabled={sendingOtp}
+                  className="w-full py-2 bg-transparent text-[#E08A17] hover:text-[#F7F2F2] font-mono text-xs uppercase transition-colors disabled:opacity-50"
+                >
+                  {sendingOtp ? 'SENDING NEW OTP...' : 'DIDN\'T RECEIVE IT? RESEND OTP'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
