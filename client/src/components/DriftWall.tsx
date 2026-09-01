@@ -2,6 +2,7 @@ import { CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef
 
 export interface DriftWallItem {
   image: string;
+  thumbnail?: string;
   title?: string;
   href?: string;
 }
@@ -30,6 +31,7 @@ export interface DriftWallProps {
   overlayColor?: string;
   className?: string;
   style?: CSSProperties;
+  onItemClick?: (item: DriftWallItem) => void;
 }
 
 interface ColumnMeta {
@@ -79,7 +81,8 @@ const DriftWall = ({
   grayscale = false,
   overlayColor = '#060010',
   className = '',
-  style
+  style,
+  onItemClick
 }: DriftWallProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const planeRef = useRef<HTMLDivElement>(null);
@@ -301,8 +304,9 @@ const DriftWall = ({
     const inner = (
       <span className={innerClass}>
         <img
-          src={item.image}
+          src={item.thumbnail || item.image}
           alt={item.title ?? ''}
+          loading="lazy"
           decoding="async"
           draggable={false}
           className={imgClass}
@@ -314,6 +318,7 @@ const DriftWall = ({
       className: cx(tileClass, activeId === id && 'is-active'),
       'data-tile-id': id,
       'data-col': colIndex,
+      onClick: () => onItemClick?.(item),
       onFocus: () => activate(id, colIndex),
       onBlur: release
     };
