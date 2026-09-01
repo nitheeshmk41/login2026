@@ -1,57 +1,115 @@
-# LOGIN 2026 — Master Web Platform Documentation
+# ⚡ LOGIN 2K26 — 35th Edition National Cyber Symposium
 
-This repository contains the complete server-rendered Multi-Page Application (MPA) for **LOGIN 2026**, the 35th Edition National Technical Symposium organized by the Computer Applications Association (CAA), Department of Computer Applications, PSG College of Technology, Coimbatore.
+![LOGIN 2K26 Group Photo](./client/public/Group_pic.webp)
+
+> **Official Full-Stack Cyberpunk Web Application** for **LOGIN 2K26**, organized by the **Computer Applications Association (CAA)**, Department of Computer Applications, **PSG College of Technology**, Coimbatore.
 
 ---
 
-## 1. Setup & Installation Guide
+## 🌟 Overview & Key Features
+
+![LOGIN 2K26 Hero Banner](./client/public/final_hero_doom.webp)
+
+LOGIN 2K26 is an ultra-modern, high-performance national-level cyber symposium platform built with state-of-the-art web technologies and styled with a sleek cyberpunk aesthetic.
+
+### 🎯 Key Highlights
+
+* 🕶️ **3D Interactive Drift Wall Gallery**: Lightweight WebP image tile streaming with built-in full-screen Lightbox view.
+* 🛡️ **Role-Based Access Control (RBAC)**: Enforced authorization for `admin`, `coordinator`, `registration_desk`, and `participant`.
+* 👥 **Squad Formation & Team Management**: Automated invitation, join requests, and strict scheduling collision detection.
+* 💳 **Automated Financial Ledger & UTR Verification**: Instant UTR reference tracking, receipt handling, and bulk CSV payment reconciliation.
+* ⚡ **Performance Optimized**: Sub-millisecond payload delivery with lazy loading, WebP images, and Vite-optimized bundles.
+
+---
+
+## 📸 Organizing Team & Delegates Showcase
+
+![LOGIN 2K26 Organizing Team & Delegates](./client/public/coords_bold.webp)
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend Framework** | React 18 + Vite + TypeScript + Tailwind CSS |
+| **Icons & Micro-animations** | Lucide React + Framer Motion |
+| **State Management** | Zustand (`authStore.ts`) |
+| **Backend API** | Node.js + Express.js |
+| **Database & ORM** | PostgreSQL + Sequelize ORM |
+| **Authentication** | JWT (Cookie + Bearer) + Email OTP verification |
+| **Email Service** | Nodemailer (SMTP with HTML brand templates) |
+
+---
+
+## 🚀 Setup & Local Development Guide
 
 ### Prerequisites
-- Node.js 20 LTS & npm 10
-- Database: SQLite (default dev mode via `USE_SQLITE=true`) or PostgreSQL
-- SMTP account (Gmail App Password or custom SMTP server)
+* **Node.js**: `v20.x` or higher
+* **npm**: `v10.x` or higher
+* **PostgreSQL** or **SQLite** database
 
-### Step-by-Step Installation
-1. Clone the repository and install server dependencies:
-   ```bash
-   npm install
-   ```
-2. Create environment file:
-   ```bash
-   cp .env.example .env
-   ```
-3. Initialize the database schema & seed official events:
-   ```bash
-   node server/seed_events.js
-   ```
-4. Start the Express application:
-   ```bash
-   node server/server.js
-   ```
-5. Access the site in your browser:
-   - Public site: `https://login.psgtech.ac.in/`
-   - Command Console & Hero: `https://login.psgtech.ac.in/`
-   - Events Index (11): `https://login.psgtech.ac.in/events`
-   - Timeline Schedule Grid: `https://login.psgtech.ac.in/timeline`
-   - Admin Panel: `https://login.psgtech.ac.in/admin`
+### 1. Clone & Install Dependencies
 
-   This Compose project does not run Nginx. The frontend listens on its
-   internal port `5173` and joins the external Nginx Proxy Manager network
-   `npm_default`. Configure Nginx Proxy Manager for `login.psgtech.ac.in` with:
-   `login2k26-frontend` as the forward hostname and `5173` as the forward port.
-   Nginx Proxy Manager should terminate HTTPS on ports `80` and `443` and
-   redirect HTTP to HTTPS. The frontend proxies `/api` internally to the
-   private backend container.
+```bash
+# Install root, client, and server dependencies
+npm install
+cd client && npm install
+cd ../server && npm install
+```
+
+### 2. Environment Configuration
+
+Copy the sample environment file and configure database credentials:
+
+```bash
+cp .env.example .env
+```
+
+Set up key variables:
+```env
+PORT=5000
+FRONTEND_URL=http://localhost:5173
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/login2026
+JWT_SECRET=your_super_secret_jwt_key
+```
+
+### 3. Initialize & Seed Database
+
+```bash
+node server/seed_events.js
+```
+
+### 4. Run Locally
+
+```bash
+# Terminal 1: Run Express API Server
+cd server
+npm run dev
+
+# Terminal 2: Run Vite Client App
+cd client
+npm run dev
+```
+
+Visit the app at `http://localhost:5173`.
 
 ---
 
-## 2. Organizing Committee Operations Sheet
+## 📑 Organizing Committee Operations Guide
 
 | Action | Execution Procedure |
 |---|---|
-| **Add or Modify Event** | Go to `/admin?tab=events`, fill the event details form (name, category, team size, venue, IST timings), and click Save. Changes trigger SSE live timeline updates. |
-| **Verify Participant Payment** | Go to `/admin?tab=payments`, review the submitted UTR reference code, and click **APPROVE**. This generates the unique `LGN26-XXXX` Student ID and unlocks event registrations for the user. |
-| **Reject Invalid Payment** | Click **REJECT**, type a clear reason (e.g. "UTR not found on bank statement"), and submit. The participant can resubmit a corrected reference code. |
-| **Assign Event Coordinator** | Go to `/admin?tab=users`, change the user's role to `event_coordinator`. On their first login, they will be forced to change their default password. |
-| **Broadcast Ticker Announcement** | Go to `/admin?tab=announcements`, enter the title tag and broadcast message, and click **BROADCAST**. The message immediately streams across the site header. |
-| **Export Registrations to CSV** | Go to `/admin?tab=participants` and click **EXPORT PARTICIPANTS CSV**. |
+| **Add / Modify Event** | Navigate to `/dashboard/admin`, select **Events**, fill details (name, category, team size, venue, timing), and click Save. |
+| **Verify Payment** | Go to `/dashboard/admin` → **Payments**, review UTR number, and click **APPROVE**. Generates `LGN26-XXXX` Student ID. |
+| **Bulk CSV Payment Match** | Upload payment export CSV directly into the Payment Verification tab for automatic UTR matching and batch verification. |
+| **Manage Users & Roles** | Go to `/dashboard/admin` → **Users**, update roles (`admin`, `coordinator`, `registration_desk`, `participant`). |
+| **Broadcast Ticker Alerts** | Go to `/dashboard/admin` → **Announcements**, enter alert text, and broadcast across the site ticker instantly. |
+| **Export Roster & Reports** | Download live CSV reports for Master Roster, Financial Ledger, Squad Formations, and Event Attendance. |
+
+---
+
+## 📜 License
+
+Designed and developed by the **Computer Applications Association (CAA)**, Department of Computer Applications, PSG College of Technology.
+All rights reserved © 2026.
