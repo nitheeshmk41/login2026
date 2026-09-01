@@ -16,13 +16,17 @@ const loginLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
-// OTP send limiter — 5 requests per 10 minutes per IP
+// OTP send limiter — 3 requests per 15 minutes per IP to prevent bot attacks & spam
 const otpLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: "Too many OTP requests. Please try again after 10 minutes." },
+  message: { message: "Too many OTP requests from your IP address. Please try again after 15 minutes." },
+  keyGenerator: (req) => {
+    const forwarded = req.headers["x-forwarded-for"];
+    return forwarded ? forwarded.split(",")[0].trim() : req.ip || req.socket.remoteAddress;
+  },
 });
 
 // Registration limiter — 5 registrations per 30 minutes per IP

@@ -123,21 +123,37 @@ const generateLoginId = async (transaction) => {
 const sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ message: "Valid email address is required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Anti-bot & Flood Prevention: Check for 60-second per-email cooldown
+    const existingOtp = await otpModel.findOne({ where: { email: normalizedEmail } });
+    if (existingOtp) {
+      const now = Date.now();
+      const lastSentTime = new Date(existingOtp.updatedAt || existingOtp.createdAt).getTime();
+      const secondsPassed = (now - lastSentTime) / 1000;
+
+      if (secondsPassed < 60) {
+        const waitSeconds = Math.ceil(60 - secondsPassed);
+        return res.status(429).json({
+          message: `Please wait ${waitSeconds} second${waitSeconds === 1 ? '' : 's'} before requesting a new OTP.`,
+        });
+      }
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    const existingOtp = await otpModel.findOne({ where: { email: email.toLowerCase() } });
     if (existingOtp) {
       await existingOtp.update({ otp, expires_at: expiresAt });
     } else {
-      await otpModel.create({ email: email.toLowerCase(), otp, expires_at: expiresAt });
+      await otpModel.create({ email: normalizedEmail, otp, expires_at: expiresAt });
     }
 
-    await sendOtpEmail(email, otp, 10);
+    await sendOtpEmail(normalizedEmail, otp, 10);
 
     return res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {

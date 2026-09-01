@@ -116,11 +116,20 @@ export const RegisterPage: React.FC = () => {
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(0);
   
   // OTP Modal State
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [pendingData, setPendingData] = useState<any>(null);
   const [otpValue, setOtpValue] = useState('');
+
+  useEffect(() => {
+    if (otpTimer <= 0) return;
+    const interval = setInterval(() => {
+      setOtpTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [otpTimer]);
 
   const handleSendOtp = async () => {
     const email = pendingData?.email || (activeForm.getValues() as any).email as string;
@@ -134,6 +143,7 @@ export const RegisterPage: React.FC = () => {
       setSendingOtp(true);
       await api.auth.sendOtp(email);
       setOtpSent(true);
+      setOtpTimer(60);
     } catch (err: any) {
       setServerError(err.response?.data?.message || 'Failed to send OTP');
     } finally {
@@ -698,10 +708,14 @@ END:VCALENDAR`;
                 </button>
                 <button
                   onClick={handleSendOtp}
-                  disabled={sendingOtp}
+                  disabled={sendingOtp || otpTimer > 0}
                   className="w-full py-2 bg-transparent text-[#E08A17] hover:text-[#F7F2F2] font-mono text-xs uppercase transition-colors disabled:opacity-50"
                 >
-                  {sendingOtp ? 'SENDING NEW OTP...' : 'DIDN\'T RECEIVE IT? RESEND OTP'}
+                  {sendingOtp
+                    ? 'SENDING NEW OTP...'
+                    : otpTimer > 0
+                    ? `RESEND OTP IN ${otpTimer}s`
+                    : "DIDN'T RECEIVE IT? RESEND OTP"}
                 </button>
               </div>
             </div>
