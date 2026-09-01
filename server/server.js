@@ -10,10 +10,12 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_login_2
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'super_secret_session_key_login_2026';
 process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+const fs = require("fs");
 const app = require("./app");
 const { connectPostgres, sequelize, neonSequelize } = require("./config/db/postgres");
 require("./models/postgres");
 const userModel = require("./models/postgres/userModel");
+const eventModel = require("./models/postgres/eventModel");
 const { startSyncCron, syncLocalToNeon } = require("./services/dbSync");
 
 const PORT = process.env.PORT || 5000;
@@ -80,6 +82,58 @@ const startServer = async () => {
     await safeAddColumn('events', 'coordinator_name', { type: DataTypes.STRING(255) });
     await safeAddColumn('events', 'coordinator_phone', { type: DataTypes.STRING(255) });
     await safeAddColumn('users', 'accommodation_required', { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false });
+
+    const seedEventCatalog = async () => {
+      const eventFile = path.resolve(__dirname, '../client/src/data/events.json');
+      if (!fs.existsSync(eventFile)) {
+        return;
+      }
+
+      const raw = fs.readFileSync(eventFile, 'utf8');
+      const eventList = JSON.parse(raw);
+      if (!Array.isArray(eventList) || eventList.length === 0) {
+        return;
+      }
+
+      for (const event of eventList) {
+        const eventPayload = {
+          id: event.id,
+          name: event.name,
+          description: event.description || '',
+          coordinator_name: event.coordinator_name || null,
+          coordinator_phone: event.coordinator_phone || null,
+          date: event.date || '2026-09-18',
+          start_time: event.start_time || '09:00:00',
+          end_time: event.end_time || '11:00:00',
+          venue: event.venue || 'TBA',
+          is_online: Boolean(event.is_online),
+          max_participants: event.max_participants || 0,
+          category: (event.category || 'TECHNICAL').toUpperCase() === 'FLAGSHIP' ? 'FLAGSHIP' : ((event.category || 'TECHNICAL').toUpperCase() === 'NON_TECHNICAL' ? 'NON_TECHNICAL' : 'TECHNICAL'),
+          team_type: (event.team_type || 'INDIVIDUAL').toUpperCase() === 'TEAM' ? 'TEAM' : 'INDIVIDUAL',
+          min_team_size: event.min_team_size || 1,
+          max_team_size: event.max_team_size || 1,
+          day: event.day || 18,
+          registration_deadline: event.registration_deadline || null,
+          is_flagship: Boolean(event.is_flagship || event.category === 'FLAGSHIP'),
+          guardian_asset: event.guardian_asset || null,
+          entry_fee: event.entry_fee || 0,
+          rules_url: event.rules_url || null,
+          is_results_locked: Boolean(event.is_results_locked),
+          status: event.status || 'open',
+        };
+
+        const existingEvent = await eventModel.findOne({ where: { name: eventPayload.name } });
+        if (existingEvent) {
+          await existingEvent.update(eventPayload);
+        } else {
+          await eventModel.create(eventPayload);
+        }
+      }
+
+      console.log(`Seeded ${eventList.length} events into the database.`);
+    };
+
+    await seedEventCatalog();
     await safeAddColumn('payments', 'payment_date', { type: DataTypes.STRING(255) });
     await safeAddColumn('payments', 'payment_method', { type: DataTypes.STRING(255), defaultValue: 'UPI' });
     await safeAddColumn('users', 'login_id', { type: DataTypes.STRING(20), unique: true });

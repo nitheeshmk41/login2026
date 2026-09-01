@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import eventsData from '../data/events.json';
 import { useAuthStore } from '../store/authStore';
 import { CheckCircle2, Filter } from 'lucide-react';
 import { TimelineSection } from '../components/home/TimelineSection';
@@ -187,10 +186,16 @@ export const EventsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
-  const [events] = useState<Event[]>(eventsData as any);
+  const [events, setEvents] = useState<Event[]>([]);
   const [userRegistrations, setUserRegistrations] = useState<number[]>([]);
 
   const categoryParam = searchParams.get('category')?.toUpperCase() || 'ALL';
+
+  useEffect(() => {
+    api.events.getAll().then((res) => {
+      if (Array.isArray(res.data)) setEvents(res.data);
+    }).catch(() => setEvents([]));
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'participant') {

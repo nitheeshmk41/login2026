@@ -62,7 +62,7 @@ const eventModel = sequelize.define(
     },
 
     category: {
-      type: DataTypes.ENUM("TECHNICAL", "NON_TECHNICAL"),
+      type: DataTypes.ENUM("TECHNICAL", "NON_TECHNICAL", "FLAGSHIP"),
       allowNull: false,
       defaultValue: "TECHNICAL",
     },

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
-import eventsData from '../data/events.json';
 import { Monitor, ArrowLeft, Clock, ShieldAlert, CheckCircle2, MapPin, Users, Phone, Sparkles, Terminal, Check } from 'lucide-react';
 
 export const EventDetailsPage: React.FC = () => {
@@ -11,6 +10,16 @@ export const EventDetailsPage: React.FC = () => {
   const { isAuthenticated, user, survivor } = useAuthStore();
   
   const [userRegistrations, setUserRegistrations] = useState<number[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+
+  useEffect(() => {
+    api.events.getAll().then((res) => {
+      if (Array.isArray(res.data)) {
+        const match = res.data.find((e: any) => e.slug === slug || String(e.id) === String(slug));
+        setSelectedEvent(match || null);
+      }
+    }).catch(() => setSelectedEvent(null));
+  }, [slug]);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'participant') {
@@ -21,8 +30,6 @@ export const EventDetailsPage: React.FC = () => {
       }).catch(() => {});
     }
   }, [isAuthenticated, user]);
-
-  const selectedEvent = eventsData.find((e: any) => e.slug === slug) as any;
 
   if (!selectedEvent) {
     return (

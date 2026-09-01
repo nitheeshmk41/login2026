@@ -145,6 +145,23 @@ export const RegisterPage: React.FC = () => {
       setServerError('This email address is already registered in our database.');
       return;
     }
+
+    if (!otpSent) {
+      try {
+        await handleSendOtp();
+        setServerError(null);
+        setOtpMessage('OTP sent successfully. Enter the code and submit to complete registration.');
+      } catch (err: any) {
+        setServerError(err.response?.data?.message || 'Failed to send OTP');
+      }
+      return;
+    }
+
+    if (!data.otp || !/^\d{6}$/.test(String(data.otp).trim())) {
+      setServerError('A valid 6-digit OTP is required before onboarding the participant.');
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await api.auth.register({

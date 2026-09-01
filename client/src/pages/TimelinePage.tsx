@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import eventsData from '../data/events.json';
 import { useAuthStore } from '../store/authStore';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Clock, MapPin, Calendar, LayoutGrid, BarChart3, ChevronRight, Trophy } from 'lucide-react';
@@ -44,13 +43,17 @@ export const TimelinePage: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
 
-  const [events] = useState<Event[]>(eventsData as any);
+  const [events, setEvents] = useState<Event[]>([]);
   const [selectedDay, setSelectedDay] = useState<number>(18);
   const [viewMode, setViewMode] = useState<'GANTT' | 'CARDS'>('GANTT');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'TECHNICAL' | 'NON_TECHNICAL'>('ALL');
   const [userRegistrations, setUserRegistrations] = useState<number[]>([]);
 
-  // Removed fetchTimeline useEffect since eventsData is statically loaded
+  useEffect(() => {
+    api.events.getAll().then((res) => {
+      if (Array.isArray(res.data)) setEvents(res.data);
+    }).catch(() => setEvents([]));
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'participant') {
