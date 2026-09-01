@@ -17,6 +17,10 @@ const getAllUsers = async (req, res) => {
           as: "eventAssignments",
           include: [{ model: eventModel, as: "event", attributes: ["id", "name"] }],
         },
+        {
+          model: paymentModel,
+          as: "payments",
+        }
       ],
       order: [["createdAt", "DESC"]],
     });
@@ -60,23 +64,34 @@ const updateMyProfile = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    if (req.body.name && String(req.body.name).trim().length > 35) {
+      return res.status(400).json({ message: "Full name must not exceed 35 characters." });
+    }
+
     const allowedFields = [
       "name",
+      "email",
       "phone",
       "college_name",
       "department",
       "roll_no",
+      "gender",
+      "year_of_study",
+      "place",
+      "current_organization",
     ];
 
     const updates = {};
     for (const field of allowedFields) {
-      if (req.body[field] !== undefined) updates[field] = req.body[field];
+      if (req.body[field] !== undefined) {
+        updates[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
+      }
     }
 
     await user.update(updates);
 
     return res.json({
-      message: "Profile updated",
+      message: "Profile updated successfully",
       user: {
         ...user.toJSON(),
         password: undefined,
@@ -99,34 +114,49 @@ const updateUserRole = async (req, res) => {
       "registration_desk",
     ];
 
-    const requestedRole = req.body.role;
+    const normalizeRole = (role) => {
+      const normalized = String(role || '').trim().toLowerCase();
+      const roleMap = {
+        student: 'participant',
+        participant: 'participant',
+        event_coordinator: 'coordinator',
+        coordinator: 'coordinator',
+        special_user: 'coordinator',
+        junior_attendance: 'coordinator',
+        registration_desk: 'registration_desk',
+        desk: 'registration_desk',
+        admin: 'admin',
+        super_admin: 'admin',
+        admin_power: 'admin',
+      };
+
+      if (roleMap[normalized]) return roleMap[normalized];
+      if (normalized.includes('coord')) return 'coordinator';
+      if (normalized.includes('desk')) return 'registration_desk';
+      if (normalized.includes('admin')) return 'admin';
+      return 'participant';
+    };
+
+    const requestedRole = normalizeRole(req.body.role);
     const requestedEventId = req.body.event_id ? Number(req.body.event_id) : null;
 
     if (!allowedRoles.includes(requestedRole)) {
-      return res.status(400).json({ message: "Invalid role" });
+      return res.status(400).json({ message: `Invalid role: ${req.body.role}` });
     }
 
-    if (["coordinator", "registration_desk"].includes(requestedRole) && !requestedEventId) {
-      return res.status(400).json({ message: "An event is required for coordinators and registration desks" });
-    }
+    // Save the role change to the database
+    await user.update({ role: requestedRole });
 
-    await user.update({
-      role: requestedRole,
-      user_type: requestedRole === "participant" ? "PARTICIPANT" : "STAFF",
-    });
-
-    if (["coordinator", "registration_desk"].includes(requestedRole)) {
+    if (["coordinator", "registration_desk"].includes(requestedRole) && requestedEventId) {
       const event = await eventModel.findByPk(requestedEventId);
-      if (!event) {
-        return res.status(400).json({ message: "Selected event was not found" });
-      }
+      if (event) {
+        const existingAssignment = await eventCoordinatorModel.findOne({
+          where: { user_id: user.id, event_id: requestedEventId },
+        });
 
-      const existingAssignment = await eventCoordinatorModel.findOne({
-        where: { user_id: user.id, event_id: requestedEventId },
-      });
-
-      if (!existingAssignment) {
-        await eventCoordinatorModel.create({ user_id: user.id, event_id: requestedEventId });
+        if (!existingAssignment) {
+          await eventCoordinatorModel.create({ user_id: user.id, event_id: requestedEventId });
+        }
       }
     }
 
@@ -134,7 +164,9 @@ const updateUserRole = async (req, res) => {
       await paymentModel.destroy({ where: { student_id: user.id } });
     }
 
-    return res.json({ message: "User role updated", user });
+    const safeUser = user.toJSON();
+    delete safeUser.password;
+    return res.json({ message: "User role updated", user: safeUser });
   } catch (error) {
     return res.status(500).json({ message: "Failed to update role", error: error.message });
   }
@@ -167,17 +199,20 @@ const updateUserDetails = async (req, res) => {
   try {
     const user = await userModel.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    if (!["PARTICIPANT", "ALUMNI"].includes(user.user_type)) {
-      return res.status(403).json({ message: "Staff account details cannot be edited here" });
-    }
 
     const allowedFields = [
-      "name", "email", "phone", "college_name", "department", "roll_no",
-      "gender", "year_of_study", "batch_year", "place", "current_organization",
+      "name", "email", "phone", "college_name", "college", "department", "roll_no",
+      "gender", "year_of_study", "batch_year", "place", "current_organization", "login_id", "role",
     ];
     const updates = {};
     for (const field of allowedFields) {
-      if (req.body[field] !== undefined) updates[field] = req.body[field];
+      if (req.body[field] !== undefined) {
+        if (field === "college") {
+          updates.college_name = req.body[field];
+        } else {
+          updates[field] = req.body[field];
+        }
+      }
     }
     if (!updates.name || !updates.email) {
       return res.status(400).json({ message: "Name and email are required" });
@@ -196,8 +231,9 @@ const deleteUser = async (req, res) => {
   try {
     const user = await userModel.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    if (!["PARTICIPANT", "ALUMNI"].includes(user.user_type)) {
-      return res.status(403).json({ message: "Staff accounts cannot be deleted here" });
+
+    if (req.user && req.user.id === user.id) {
+      return res.status(400).json({ message: "You cannot delete your own account" });
     }
 
     await user.destroy();
@@ -251,19 +287,30 @@ const createUserByAdmin = async (req, res) => {
       return res.status(400).json({ message: "Name, email, and password are required" });
     }
 
-    const allowedRoles = [
-      "participant",
-      "coordinator",
-      "admin",
-      "registration_desk",
-    ];
-    const assignedRole = role || "participant";
-    if (!allowedRoles.includes(assignedRole)) {
-      return res.status(400).json({ message: "Invalid role" });
-    }
-    if (["coordinator", "registration_desk"].includes(assignedRole) && !event_id) {
-      return res.status(400).json({ message: "An event is required for coordinators and registration desks" });
-    }
+    const normalizeRole = (role) => {
+      const normalized = String(role || '').trim().toLowerCase();
+      const roleMap = {
+        student: 'participant',
+        participant: 'participant',
+        event_coordinator: 'coordinator',
+        coordinator: 'coordinator',
+        special_user: 'coordinator',
+        junior_attendance: 'coordinator',
+        registration_desk: 'registration_desk',
+        desk: 'registration_desk',
+        admin: 'admin',
+        super_admin: 'admin',
+        admin_power: 'admin',
+      };
+
+      if (roleMap[normalized]) return roleMap[normalized];
+      if (normalized.includes('coord')) return 'coordinator';
+      if (normalized.includes('desk')) return 'registration_desk';
+      if (normalized.includes('admin')) return 'admin';
+      return 'participant';
+    };
+
+    const assignedRole = normalizeRole(role);
 
     const existing = await userModel.findOne({ where: { email: email.toLowerCase().trim() } });
     if (existing) {
@@ -297,14 +344,11 @@ const createUserByAdmin = async (req, res) => {
     const student_id_code = `LGN26-${paddedId}`;
     await newUser.update({ student_id_code });
 
-    if (["coordinator", "registration_desk"].includes(assignedRole)) {
+    if (["coordinator", "registration_desk"].includes(assignedRole) && event_id) {
       const event = await eventModel.findByPk(event_id);
-      if (!event) {
-        await newUser.destroy();
-        return res.status(400).json({ message: "Selected event was not found" });
+      if (event) {
+        await eventCoordinatorModel.create({ event_id: Number(event_id), user_id: newUser.id });
       }
-
-      await eventCoordinatorModel.create({ event_id, user_id: newUser.id });
     }
 
     return res.status(201).json({

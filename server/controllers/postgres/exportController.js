@@ -93,7 +93,7 @@ const exportRegistrations = async (req, res) => {
   try {
     const registrations = await registrationModel.findAll({
       include: [{ model: userModel, as: "student" }],
-      order: [["created_at", "DESC"]]
+      order: [["createdAt", "DESC"]]
     });
     const rows = registrations.map((r) => ({
       reg_id: r.id,
@@ -102,7 +102,7 @@ const exportRegistrations = async (req, res) => {
       student_email: r.student?.email || '',
       team_id: r.team_id || '',
       status: r.status,
-      created_at: r.created_at
+      created_at: r.createdAt
     }));
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", 'attachment; filename="all_registrations.csv"');
@@ -115,17 +115,17 @@ const exportRegistrations = async (req, res) => {
 const exportPayments = async (req, res) => {
   try {
     const payments = await paymentModel.findAll({
-      include: [{ model: userModel, as: "user" }],
-      order: [["created_at", "DESC"]]
+      include: [{ model: userModel, as: "student" }],
+      order: [["createdAt", "DESC"]]
     });
     const rows = payments.map((p) => ({
       payment_id: p.id,
       amount: p.amount,
-      user_name: p.user?.name || '',
-      user_email: p.user?.email || '',
+      student_name: p.student?.name || '',
+      student_email: p.student?.email || '',
       transaction_ref: p.transaction_reference,
       status: p.status,
-      created_at: p.created_at
+      created_at: p.createdAt
     }));
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", 'attachment; filename="financial_ledger.csv"');
@@ -138,16 +138,16 @@ const exportPayments = async (req, res) => {
 const exportTeams = async (req, res) => {
   try {
     const teams = await teamModel.findAll({
-      include: [{ model: userModel, as: "leader" }],
-      order: [["created_at", "DESC"]]
+      include: [{ model: userModel, as: "creator" }],
+      order: [["createdAt", "DESC"]]
     });
     const rows = teams.map((t) => ({
       team_id: t.id,
       event_id: t.event_id,
       team_name: t.name,
-      leader_name: t.leader?.name || '',
-      leader_email: t.leader?.email || '',
-      created_at: t.created_at
+      leader_name: t.creator?.name || '',
+      leader_email: t.creator?.email || '',
+      created_at: t.createdAt
     }));
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", 'attachment; filename="squad_formations.csv"');
